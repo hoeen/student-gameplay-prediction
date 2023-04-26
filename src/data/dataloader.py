@@ -7,7 +7,11 @@ import numpy as np
 import pandas as pd
 import torch
 import tqdm
-from sklearn.preprocessing import LabelEncoder
+from sklearn.preprocessing import OrdinalEncoder
+
+import pickle
+
+from utils import logging_time
 
 
 class Preprocess:
@@ -15,7 +19,9 @@ class Preprocess:
         self.args = args
         self.train_data = None
         self.test_data = None
-
+        self.num_cols = ['elapsed_time', 'event_name', 'name', 'level']
+        self.cate_cols = ['event_name', 'name', 'fqid', 'room_fqid', 'text_fqid']
+        
     def get_train_data(self):
         return self.train_data
 
@@ -37,36 +43,26 @@ class Preprocess:
         return data_1, data_2
 
     def __save_labels(self, encoder, name):
-        le_path = os.path.join(self.args.asset_dir, name + "_classes.npy")
-        np.save(le_path, encoder.classes_)
+        le_path = os.path.join(self.args.processed_dir, name + "_classes.npy")
+        np.save(le_path, encoder.categories_[0])
 
+    @logging_time
     def __preprocessing(self, df, is_train=True):
-        num_cols = ['elapsed_time', 'event_name', 'name', 'level']
-        cate_cols = ['event_name', 'name', 'fqid', 'room_fqid', 'text_fqid']
-
-        if not os.path.exists(self.args.asset_dir):
-            os.makedirs(self.args.asset_dir)
-
-        for col in cate_cols:
-
-            le = LabelEncoder()
-            if is_train:
+    
+        for col in self.cate_cols:
+            if is_train:   #train
+                le = OrdinalEncoder()
                 # For UNKNOWN class
-                a = df[col].unique().tolist() + ["unknown"]
-                le.fit(a)
+                le.fit(df[[col]])
                 self.__save_labels(le, col)
-            else:
-                label_path = os.path.join(self.args.asset_dir, col + "_classes.npy")
-                le.classes_ = np.load(label_path)
-
-                df[col] = df[col].apply(
-                    lambda x: x if str(x) in le.classes_ else "unknown"
-                )
-
-            # 모든 컬럼이 범주형이라고 가정
-            df[col] = df[col].astype(str)
-            test = le.transform(df[col])
+            else:  #inference
+                label_path = os.path.join(self.args.processed_dir, col + "_classes.npy")
+                le.categories_[0] = np.load(label_path, allow_pickle=True)
+                
+            
+            test = le.transform(df[[col]])
             df[col] = test
+        
 
         return df
 
@@ -74,46 +70,43 @@ class Preprocess:
         # TODO
         return df
 
-    def load_data_from_file(self, file_name, is_train=True):
+    def load_data_from_file(self, file_name, is_train=True, processed=False):
         csv_file_path = os.path.join(self.args.data_dir, file_name)
-        df = pd.read_parquet(csv_file_path)  # , nrows=100000)
-        df = self.__feature_engineering(df)
-        df = self.__preprocessing(df, is_train)
+        proc_file_path = os.path.join(self.args.processed_dir, file_name)
+        if not processed:
+            df = pd.read_parquet(csv_file_path)  # , nrows=100000)
+            df = self.__feature_engineering(df)
+            df = self.__preprocessing(df, is_train)
+            df.to_parquet(proc_file_path)
+        else:
+            df = pd.read_parquet(proc_file_path)
 
         # 추후 feature를 embedding할 시에 embedding_layer의 input 크기를 결정할때 사용
+        for cate in self.cate_cols:
+            # 'event_name', 'name', 'fqid', 'room_fqid', 'text_fqid'
+            # self.args.cate 로 지정
+            setattr(self.args, 
+                    'input_size_'+cate, 
+                    len(np.load(os.path.join(self.args.processed_dir, cate + "_classes.npy"), allow_pickle=True)) 
+            )
+        
 
-        self.args.n_questions = len(
-            np.load(os.path.join(self.args.asset_dir, "assessmentItemID_classes.npy"))
-        )
-        self.args.n_test = len(
-            np.load(os.path.join(self.args.asset_dir, "testId_classes.npy"))
-        )
-        self.args.n_tag = len(
-            np.load(os.path.join(self.args.asset_dir, "KnowledgeTag_classes.npy"))
-        )
-
-        df = df.sort_values(by=["userID", "Timestamp"], axis=0)
-        columns = ["userID", "assessmentItemID", "testId", "answerCode", "KnowledgeTag"]
+        # df = df.sort_values(by=["userID", "Timestamp"], axis=0)
+        columns = ["session_id"] + self.cate_cols + self.num_cols
         group = (
-            df[columns]
-            .groupby("userID")
+            df.groupby("session_id")
             .apply(
-                lambda r: (
-                    r["testId"].values,
-                    r["assessmentItemID"].values,
-                    r["KnowledgeTag"].values,
-                    r["answerCode"].values,
-                )
+                lambda r: tuple([r[col].values for col in columns[1:]])
             )
         )
 
         return group.values
 
     def load_train_data(self, file_name):
-        self.train_data = self.load_data_from_file(file_name)
+        self.train_data = self.load_data_from_file(file_name, processed=self.args.processed)
 
     def load_test_data(self, file_name):
-        self.test_data = self.load_data_from_file(file_name, is_train=False)
+        self.test_data = self.load_data_from_file(file_name, is_train=False, processed=True)
 
 
 class DKTDataset(torch.utils.data.Dataset):

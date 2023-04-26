@@ -1,6 +1,6 @@
 import os
 import random
-
+import time
 import numpy as np
 import torch
 
@@ -18,3 +18,12 @@ def setSeeds(seed=42):
     torch.backends.cudnn.benchmark = False
     ###
     torch.backends.cudnn.deterministic = True
+
+def logging_time(original_fn):
+    def wrapper_fn(*args, **kwargs):
+        start_time = time.time()
+        result = original_fn(*args, **kwargs)
+        end_time = time.time()
+        print("WorkingTime[{}]: {} sec".format(original_fn.__name__, end_time-start_time))
+        return result
+    return wrapper_fn

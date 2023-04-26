@@ -14,8 +14,9 @@ def parse_args():
         type=str,
         help="data directory",
     )
+    
     parser.add_argument(
-        "--asset_dir", default="/opt/ml/wooseok/student-gameplay-prediction/data/raw/input/asset/", type=str, help="asset directory"
+        "--processed_dir", default="/opt/ml/wooseok/student-gameplay-prediction/data/processed/", type=str, help="processed data directory"
     )
 
     parser.add_argument(
@@ -23,7 +24,7 @@ def parse_args():
     )
 
     parser.add_argument(
-        "--fe", default=False, type=bool, help='FE 된 데이터를 쓰는지 여부. 기본값은 False로 FE를 수행함. FE 된 데이터 갖다쓰면 True로 설정하면 FE 안하고 넘어감'
+        "--processed", default=0, type=int, help='whether input data is processed or not'
     )
 
     parser.add_argument(
