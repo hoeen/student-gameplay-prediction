@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 import torch
 import tqdm
-from sklearn.preprocessing import OrdinalEncoder
+from sklearn.preprocessing import OrdinalEncoder, RobustScaler
 
 import pickle
 
@@ -19,7 +19,7 @@ class Preprocess:
         self.args = args
         self.train_data = None
         self.test_data = None
-        self.num_cols = ['elapsed_time', 'event_name', 'name', 'level']
+        self.num_cols = ['elapsed_time', 'level']
         self.cate_cols = ['event_name', 'name', 'fqid', 'room_fqid', 'text_fqid']
         
     def get_train_data(self):
@@ -45,10 +45,17 @@ class Preprocess:
     def __save_labels(self, encoder, name):
         le_path = os.path.join(self.args.processed_dir, name + "_classes.npy")
         np.save(le_path, encoder.categories_[0])
-
+    
+    def __save_scaler(self, scaler):
+        sc_path = os.path.join(self.args.processed_dir, "cont_scaler.pkl")
+        with open(sc_path, 'wb') as f:
+            pickle.dump(scaler, f) # scaler 자체를 저장
+    
+    
     @logging_time
     def __preprocessing(self, df, is_train=True):
-    
+        
+        # ordinal encoding
         for col in self.cate_cols:
             if is_train:   #train
                 le = OrdinalEncoder()
@@ -58,10 +65,23 @@ class Preprocess:
             else:  #inference
                 label_path = os.path.join(self.args.processed_dir, col + "_classes.npy")
                 le.categories_[0] = np.load(label_path, allow_pickle=True)
-                
-            
+
             test = le.transform(df[[col]])
             df[col] = test
+            
+        # scaling - using Robustscaling because of outliers in elapsedtime
+        # self.num_cols
+        if is_train:
+            scaler = RobustScaler()
+            scaler.fit(df[self.num_cols])
+            self.__save_scaler(scaler)
+
+        else:  #inference
+            label_path = os.path.join(self.args.processed_dir, "cont_scaler.pkl")
+            with open(label_path, 'rb') as f:
+                scaler = pickle.load(f)
+        
+        df[self.num_cols] = scaler.transform(df[self.num_cols])
         
 
         return df
@@ -82,6 +102,8 @@ class Preprocess:
             df = pd.read_parquet(proc_file_path)
 
         # 추후 feature를 embedding할 시에 embedding_layer의 input 크기를 결정할때 사용
+        self.args.cate_cols = self.cate_cols
+        self.args.num_cols = self.num_cols
         for cate in self.cate_cols:
             # 'event_name', 'name', 'fqid', 'room_fqid', 'text_fqid'
             # self.args.cate 로 지정
@@ -92,7 +114,7 @@ class Preprocess:
         
 
         # df = df.sort_values(by=["userID", "Timestamp"], axis=0)
-        columns = ["session_id"] + self.cate_cols + self.num_cols
+        columns = ["session_id"] + self.num_cols + self.cate_cols
         group = (
             df.groupby("session_id")
             .apply(
@@ -125,7 +147,7 @@ class DKTDataset(torch.utils.data.Dataset):
         cate_cols = [test, question, tag, correct]
 
         # max seq len을 고려하여서 이보다 길면 자르고 아닐 경우 그대로 냅둔다
-        if seq_len > self.args.max_seq_len:
+        if seq_len > self.args.max_seq_len: 
             for i, col in enumerate(cate_cols):
                 cate_cols[i] = col[-self.args.max_seq_len :]
             mask = np.ones(self.args.max_seq_len, dtype=np.int16)

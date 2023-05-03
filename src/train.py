@@ -3,7 +3,7 @@ import os
 import torch
 # import wandb
 from args import parse_args
-# from src import trainer
+from models import trainer
 from data.dataloader import Preprocess
 from utils import setSeeds
 
@@ -19,7 +19,6 @@ def main(args):
     train_data = preprocess.get_train_data() # train_data에는 user_id별로 모아놓은 데이터 존재.
 
     # preprocess 진행 여부 판단
-    # TODO
     train_data, valid_data = preprocess.split_data(train_data)
     
     # wandb.init(project="dkt", config=vars(args))
