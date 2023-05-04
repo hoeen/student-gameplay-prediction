@@ -37,50 +37,43 @@ class LSTM(nn.Module):
                     'embedding_' + cat_col,
                     nn.Embedding(getattr(self.args, 'input_size_'+cat_col) + 1, self.hidden_dim)       
             )
-                    
-                    
-                    
-        self.embedding_event_name = nn.Embedding(self.args.input_size_event_name + 1, self.hidden_dim)
-        
         
         
         # embedding combination projection
-        self.comb_proj = nn.Linear(self.hidden_dim, self.projection_dim)
+        self.comb_proj = nn.Linear(self.hidden_dim * len(self.args.cate_cols), self.projection_dim - len(self.args.num_cols))
 
+        # comb_proj + len(num_cols) into model
         self.lstm = nn.LSTM(
             self.input_dim, self.projection_dim, self.n_layers, batch_first=True
         )
 
         # Fully connected layer
-        self.fc = nn.Linear(self.projection_dim, 1)
-
+        self.fc = nn.Linear(self.projection_dim, 18) # 맞춰야할 문제수
+    
     def forward(self, input):
+        
+        # input 형태 : ['elapsed_time', 'level', 'event_name', 'name', 'fqid', 'room_fqid', 'text_fqid']
+        cate_data = input[2:]
+        # test, question, tag, _, mask, interaction = input
 
-        test, question, tag, _, mask, interaction = input
-
-        batch_size = interaction.size(0)
+        # batch_size = interaction.size(0)
+        batch_size = input[0].size(0)
 
         # Embedding
-        embed_interaction = self.embedding_interaction(interaction)
-        embed_test = self.embedding_test(test)
-        embed_question = self.embedding_question(question)
-        embed_tag = self.embedding_tag(tag)
-
+        # embed_event_name = self.embedding_event_name(event_name) 형식 
+        # concat all categorical 
         embed = torch.cat(
-            [
-                embed_interaction,
-                embed_test,
-                embed_question,
-                embed_tag,
-            ],
+            [getattr(self, 'embedding_' + cat_col)(cate_data[i]) for i, cat_col in enumerate(self.args.cate_cols)],
             2,
         )
 
         X = self.comb_proj(embed)
-
+        
+        # 연속형 변수를 앞에 concat
+        X = torch.cat([input[0].unsqueeze(-1), input[1].unsqueeze(-1), X], -1)
         out, _ = self.lstm(X)
-        out = out.contiguous().view(batch_size, -1, self.hidden_dim)
-        out = self.fc(out).view(batch_size, -1)
+        out = out.contiguous().view(batch_size, -1, self.projection_dim)
+        out = self.fc(out)
         return out
 
 

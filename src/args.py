@@ -10,17 +10,21 @@ def parse_args():
 
     parser.add_argument(
         "--data_dir",
-        default="/opt/ml/wooseok/student-gameplay-prediction/data/raw/input/",
+        default="/home/wooseok/Python_lab/kaggle/gameplay/student-gameplay-prediction/data/raw/input/",
         type=str,
         help="data directory",
     )
     
     parser.add_argument(
-        "--processed_dir", default="/opt/ml/wooseok/student-gameplay-prediction/data/processed/", type=str, help="processed data directory"
+        "--processed_dir", default="/home/wooseok/Python_lab/kaggle/gameplay/student-gameplay-prediction/data/processed/", type=str, help="processed data directory"
     )
 
     parser.add_argument(
         "--file_name", default="train.parquet", type=str, help="train file name"
+    )
+
+    parser.add_argument(
+        "--target_name", default="train_labels.csv", type=str, help="target file name"
     )
 
     parser.add_argument(

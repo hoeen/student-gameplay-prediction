@@ -4,7 +4,7 @@ import os
 import torch
 import wandb
 
-from data.dataloader import get_loaders
+from data.dataloader import get_loaders, get_target
 
 from .criterion import get_criterion
 from .metric import get_metric
@@ -13,8 +13,8 @@ from .optimizer import get_optimizer
 from .scheduler import get_scheduler
 
 
-def run(args, train_data, valid_data, model):
-    train_loader, valid_loader = get_loaders(args, train_data, valid_data)
+def run(args, train_data, valid_data, train_target, valid_target, model):
+    train_loader, valid_loader = get_loaders(args, train_data, valid_data, train_target, valid_target)
 
     # only when using warmup scheduler
     args.total_steps = int(math.ceil(len(train_loader.dataset) / args.batch_size)) * (
@@ -82,23 +82,22 @@ def train(train_loader, model, optimizer, scheduler, args):
     total_preds = []
     total_targets = []
     losses = []
-    for step, batch in enumerate(train_loader):
+    for step, (batch, target) in enumerate(train_loader):
         input = list(map(lambda t: t.to(args.device), process_batch(batch)))
         preds = model(input)
-        targets = input[3]  # correct
-
-        loss = compute_loss(preds, targets)
+        # TODO : loss for sequence
+        loss = compute_loss(preds, target)
         update_params(loss, model, optimizer, scheduler, args)
 
         if step % args.log_steps == 0:
             print(f"Training steps: {step} Loss: {str(loss.item())}")
 
         # predictions
-        preds = preds[:, -1]
-        targets = targets[:, -1]
+        # preds = preds[:, -1]
+        # targets = targets[:, -1]
 
         total_preds.append(preds.detach())
-        total_targets.append(targets.detach())
+        total_targets.append(target.detach())
         losses.append(loss)
 
     total_preds = torch.concat(total_preds).cpu().numpy()
@@ -110,17 +109,16 @@ def train(train_loader, model, optimizer, scheduler, args):
     print(f"TRAIN AUC : {auc} ACC : {acc}")
     return auc, acc, loss_avg
 
-
+# TODO: validate with target
 def validate(valid_loader, model, args):
     model.eval()
 
     total_preds = []
     total_targets = []
-    for step, batch in enumerate(valid_loader):
+    for step, (batch, target) in enumerate(valid_loader):
         input = list(map(lambda t: t.to(args.device), process_batch(batch)))
 
         preds = model(input)
-        targets = input[3]  # correct
 
         # predictions
         preds = preds[:, -1]
@@ -189,25 +187,13 @@ def get_model(args):
 # 배치 전처리
 def process_batch(batch):
 
-    test, question, tag, correct, mask = batch
+    mask = batch[-1]
 
-    # change to float
-    mask = mask.float()
-    correct = correct.float()
-
-    # # interaction을 임시적으로 correct를 한칸 우측으로 이동한 것으로 사용
-    # interaction = correct + 1  # 패딩을 위해 correct값에 1을 더해준다.
-    # interaction = interaction.roll(shifts=1, dims=1)
-    # interaction_mask = mask.roll(shifts=1, dims=1)
-    # interaction_mask[:, 0] = 0
-    # interaction = (interaction * interaction_mask).to(torch.int64)
-
-    #  test_id, question_id, tag
-    test = ((test + 1) * mask).int()
-    question = ((question + 1) * mask).int()
-    tag = ((tag + 1) * mask).int()
-
-    return (test, question, tag, correct, mask)
+    # 범주형 변수는 인코딩 0인 값을 없애기 위해 1씩 더해준다
+    return (*batch[:2],  
+            *map(lambda x: x.int(), [(cat+1)*mask for cat in batch[2:-1]]),
+            mask
+        )
 
 
 # loss계산하고 parameter update!
