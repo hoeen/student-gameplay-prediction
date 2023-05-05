@@ -188,8 +188,7 @@ class DKTDataset(torch.utils.data.Dataset):
         return len(self.data)
 
 
-from torch.nn.utils.rnn import pad_sequence
-
+# from torch.nn.utils.rnn import pad_sequence
 
 def collate(batch):
     col_n = len(batch[0][0])
@@ -207,6 +206,7 @@ def collate(batch):
         col_list[i] = torch.stack(col_list[i])
     # 실험 1 : max_seq_len (20)마다 18개의 답을 내도록 
     # 실험 2 : max_seq_len을 유저의 모든 로그 길이보다 크게 
+    # 결론 : max_seq_len = 2000으로 설정하여 그 이상 데이터는 DKTDataset에서 잘라버림
     return tuple(col_list), tuple([b[1] for b in batch])
 
 def get_loaders(args, train, valid, train_target, valid_target):

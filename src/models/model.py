@@ -48,7 +48,8 @@ class LSTM(nn.Module):
         )
 
         # Fully connected layer
-        self.fc = nn.Linear(self.projection_dim, 18) # 맞춰야할 문제수
+        self.fc = nn.Linear(self.projection_dim * self.args.max_seq_len, 128) # 맞춰야할 문제수
+        self.fca = nn.Linear(128, 18)
     
     def forward(self, input):
         
@@ -70,10 +71,12 @@ class LSTM(nn.Module):
         X = self.comb_proj(embed)
         
         # 연속형 변수를 앞에 concat
+        # TODO: 연속형 변수 embedding 해야할지 말지.. 
         X = torch.cat([input[0].unsqueeze(-1), input[1].unsqueeze(-1), X], -1)
         out, _ = self.lstm(X)
         out = out.contiguous().view(batch_size, -1, self.projection_dim)
-        out = self.fc(out)
+        out = self.fc(out.flatten(1))
+        out = self.fca(out)
         return out
 
 

@@ -46,7 +46,7 @@ def parse_args():
     )
 
     parser.add_argument(
-        "--max_seq_len", default=20, type=int, help="max sequence length"
+        "--max_seq_len", default=2000, type=int, help="max sequence length"
     )
     parser.add_argument("--num_workers", default=1, type=int, help="number of workers")
 
@@ -66,7 +66,7 @@ def parse_args():
 
     # 훈련
     parser.add_argument("--n_epochs", default=20, type=int, help="number of epochs")
-    parser.add_argument("--batch_size", default=64, type=int, help="batch size")
+    parser.add_argument("--batch_size", default=256, type=int, help="batch size")
     parser.add_argument("--lr", default=0.0001, type=float, help="learning rate")
     parser.add_argument("--clip_grad", default=10, type=int, help="clip grad")
     parser.add_argument("--patience", default=5, type=int, help="for early stopping")

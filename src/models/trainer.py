@@ -4,6 +4,8 @@ import os
 import torch
 import wandb
 
+from tqdm import tqdm
+
 from data.dataloader import get_loaders, get_target
 
 from .criterion import get_criterion
@@ -82,10 +84,10 @@ def train(train_loader, model, optimizer, scheduler, args):
     total_preds = []
     total_targets = []
     losses = []
-    for step, (batch, target) in enumerate(train_loader):
+    for step, (batch, target) in tqdm(enumerate(train_loader)):
         input = list(map(lambda t: t.to(args.device), process_batch(batch)))
         preds = model(input)
-        # TODO : loss for sequence
+        target = torch.Tensor(target)
         loss = compute_loss(preds, target)
         update_params(loss, model, optimizer, scheduler, args)
 
