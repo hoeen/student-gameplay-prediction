@@ -1,9 +1,10 @@
 import numpy as np
-from sklearn.metrics import accuracy_score, roc_auc_score
+from sklearn.metrics import accuracy_score, roc_auc_score, f1_score
 
 
 def get_metric(targets, preds):
+    f1 = f1_score(targets, np.where(preds >= 0.5, 1, 0), average='macro')
     auc = roc_auc_score(targets, preds)
     acc = accuracy_score(targets, np.where(preds >= 0.5, 1, 0))
 
-    return auc, acc
+    return f1, auc, acc

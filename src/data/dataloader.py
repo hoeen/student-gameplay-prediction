@@ -19,8 +19,8 @@ class Preprocess:
         self.args = args
         self.train_data = None
         self.test_data = None
-        self.num_cols = ['elapsed_time', 'level']
-        self.cate_cols = ['event_name', 'name', 'fqid', 'room_fqid', 'text_fqid']
+        self.num_cols = self.args.num_cols # ['elapsed_time', 'level']
+        self.cate_cols = self.args.cate_cols # ['event_name', 'name', 'fqid', 'room_fqid', 'text_fqid']
         
     def get_train_data(self):
         return self.train_data

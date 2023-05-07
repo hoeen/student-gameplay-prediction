@@ -8,15 +8,16 @@ def parse_args():
 
     parser.add_argument("--device", default="cpu", type=str, help="cpu or gpu")
 
+    # Data
     parser.add_argument(
         "--data_dir",
-        default="/home/wooseok/Python_lab/kaggle/gameplay/student-gameplay-prediction/data/raw/input/",
+        default="/Users/wooseokpark/github/kaggle/student-gameplay-prediction/data/raw/input/",
         type=str,
         help="data directory",
     )
     
     parser.add_argument(
-        "--processed_dir", default="/home/wooseok/Python_lab/kaggle/gameplay/student-gameplay-prediction/data/processed/", type=str, help="processed data directory"
+        "--processed_dir", default="/Users/wooseokpark/github/kaggle/student-gameplay-prediction/data/processed/", type=str, help="processed data directory"
     )
 
     parser.add_argument(
@@ -32,6 +33,20 @@ def parse_args():
     )
 
     parser.add_argument(
+        "--test_file_name", default="test.parquet", type=str, help="test file name"
+    )
+
+    parser.add_argument(
+        "--num_cols", default=['elapsed_time', 'level'], type=list, help="numeric(continuous) columns"
+    )
+    
+    parser.add_argument(
+        "--cate_cols", default=['event_name', 'name', 'fqid', 'room_fqid', 'text_fqid'], type=list, help="categorical columns"
+    )
+
+
+    # model
+    parser.add_argument(
         "--model_dir", default="models/", type=str, help="model directory"
     )
     parser.add_argument(
@@ -41,9 +56,7 @@ def parse_args():
     parser.add_argument(
         "--output_dir", default="output/", type=str, help="output directory"
     )
-    parser.add_argument(
-        "--test_file_name", default="test.parquet", type=str, help="test file name"
-    )
+    
 
     parser.add_argument(
         "--max_seq_len", default=2000, type=int, help="max sequence length"
@@ -58,7 +71,11 @@ def parse_args():
         "--hidden_dim", default=16, type=int, help="hidden dimension size"
     )
     parser.add_argument(
-        "--projection_dim", default=64, type=int, help="hidden dimension size"
+        "--lstm_hidden_dim", default=8, type=int, help="lstm hidden dimension size"
+    )
+    
+    parser.add_argument(
+        "--projection_dim", default=8, type=int, help="hidden dimension size"
     )
     parser.add_argument("--n_layers", default=2, type=int, help="number of layers")
     parser.add_argument("--n_heads", default=2, type=int, help="number of heads")
@@ -66,7 +83,7 @@ def parse_args():
 
     # 훈련
     parser.add_argument("--n_epochs", default=20, type=int, help="number of epochs")
-    parser.add_argument("--batch_size", default=256, type=int, help="batch size")
+    parser.add_argument("--batch_size", default=64, type=int, help="batch size")
     parser.add_argument("--lr", default=0.0001, type=float, help="learning rate")
     parser.add_argument("--clip_grad", default=10, type=int, help="clip grad")
     parser.add_argument("--patience", default=5, type=int, help="for early stopping")

@@ -5,12 +5,13 @@ import torch
 import wandb
 
 from tqdm import tqdm
+from datetime import datetime
 
 from data.dataloader import get_loaders, get_target
 
 from .criterion import get_criterion
 from .metric import get_metric
-from .model import LSTM, LSTMATTN, Bert
+from .model import LSTM, LSTMATTN, Bert, DNN
 from .optimizer import get_optimizer
 from .scheduler import get_scheduler
 
@@ -27,33 +28,36 @@ def run(args, train_data, valid_data, train_target, valid_target, model):
     optimizer = get_optimizer(model, args)
     scheduler = get_scheduler(optimizer, args)
 
-    best_auc = -1
+    best_f1 = -1
     early_stopping_counter = 0
+    train_time = datetime.today().strftime("%Y%m%d%H%M%S")
     for epoch in range(args.n_epochs):
 
         print(f"Start Training: Epoch {epoch + 1}")
 
         ### TRAIN
-        train_auc, train_acc, train_loss = train(
+        train_f1, train_auc, train_acc, train_loss = train(
             train_loader, model, optimizer, scheduler, args
         )
 
         ### VALID
-        auc, acc = validate(valid_loader, model, args)
+        f1, auc, acc = validate(valid_loader, model, args)
 
         ### TODO: model save or early stopping
-        wandb.log(
-            {
-                "epoch": epoch,
-                "train_loss_epoch": train_loss,
-                "train_auc_epoch": train_auc,
-                "train_acc_epoch": train_acc,
-                "valid_auc_epoch": auc,
-                "valid_acc_epoch": acc,
-            }
-        )
-        if auc > best_auc:
-            best_auc = auc
+        # wandb.log(
+        #     {
+        #         "epoch": epoch,
+        #         "train_loss_epoch": train_loss,
+        #         "train_f1_epoch": train_f1,
+        #         "train_auc_epoch": train_auc,
+        #         "train_acc_epoch": train_acc,
+        #         "valid_f1_epoch": f1,
+        #         "valid_auc_epoch": auc,
+        #         "valid_acc_epoch": acc,
+        #     }
+        # )
+        if f1 > best_f1:
+            best_f1 = f1
             # torch.nn.DataParallel로 감싸진 경우 원래의 model을 가져옵니다.
             model_to_save = model.module if hasattr(model, "module") else model
             save_checkpoint(
@@ -63,6 +67,8 @@ def run(args, train_data, valid_data, train_target, valid_target, model):
                 },
                 args.model_dir,
                 "model.pt",
+                train_time,
+                args
             )
             early_stopping_counter = 0
         else:
@@ -75,7 +81,7 @@ def run(args, train_data, valid_data, train_target, valid_target, model):
 
         # scheduler
         if args.scheduler == "plateau":
-            scheduler.step(best_auc)
+            scheduler.step(best_f1)
 
 
 def train(train_loader, model, optimizer, scheduler, args):
@@ -87,7 +93,7 @@ def train(train_loader, model, optimizer, scheduler, args):
     for step, (batch, target) in tqdm(enumerate(train_loader)):
         input = list(map(lambda t: t.to(args.device), process_batch(batch)))
         preds = model(input)
-        target = torch.Tensor(target)
+        target = torch.Tensor(target).to(args.device)
         loss = compute_loss(preds, target)
         update_params(loss, model, optimizer, scheduler, args)
 
@@ -106,10 +112,10 @@ def train(train_loader, model, optimizer, scheduler, args):
     total_targets = torch.concat(total_targets).cpu().numpy()
 
     # Train AUC / ACC
-    auc, acc = get_metric(total_targets, total_preds)
+    f1, auc, acc = get_metric(total_targets, total_preds)
     loss_avg = sum(losses) / len(losses)
-    print(f"TRAIN AUC : {auc} ACC : {acc}")
-    return auc, acc, loss_avg
+    print(f"TRAIN F1: {f1} AUC : {auc} ACC : {acc}")
+    return f1, auc, acc, loss_avg
 
 # TODO: validate with target
 def validate(valid_loader, model, args):
@@ -120,24 +126,23 @@ def validate(valid_loader, model, args):
     for step, (batch, target) in enumerate(valid_loader):
         input = list(map(lambda t: t.to(args.device), process_batch(batch)))
 
+        # predictions
         preds = model(input)
 
-        # predictions
-        preds = preds[:, -1]
-        targets = targets[:, -1]
+        target = torch.Tensor(target)
 
         total_preds.append(preds.detach())
-        total_targets.append(targets.detach())
+        total_targets.append(target)
 
     total_preds = torch.concat(total_preds).cpu().numpy()
     total_targets = torch.concat(total_targets).cpu().numpy()
 
     # Train AUC / ACC
-    auc, acc = get_metric(total_targets, total_preds)
+    f1, auc, acc = get_metric(total_targets, total_preds)
 
-    print(f"VALID AUC : {auc} ACC : {acc}\n")
+    print(f"VALID F1: {f1} AUC : {auc} ACC : {acc}")
 
-    return auc, acc
+    return f1, auc, acc
 
 
 def inference(args, test_data, model):
@@ -182,6 +187,8 @@ def get_model(args):
         model = LSTMATTN(args)
     if args.model == "bert":
         model = Bert(args)
+    if args.model == 'DNN':
+        model = DNN(args)
 
     return model
 
@@ -209,25 +216,26 @@ def compute_loss(preds, targets):
     loss = get_criterion(preds, targets)
 
     # 마지막 시퀀드에 대한 값만 loss 계산
-    loss = loss[:, -1]
+    # loss = loss[:, -1]
     loss = torch.mean(loss)
     return loss
 
 
 def update_params(loss, model, optimizer, scheduler, args):
+    optimizer.zero_grad()
     loss.backward()
     torch.nn.utils.clip_grad_norm_(model.parameters(), args.clip_grad)
     if args.scheduler == "linear_warmup":
         scheduler.step()
     optimizer.step()
-    optimizer.zero_grad()
+    # optimizer.zero_grad()
 
 
-def save_checkpoint(state, model_dir, model_filename):
-    print("saving model ...")
+def save_checkpoint(state, model_dir, model_filename, train_time, args):
+    print(f"saving {args.model} model ...")
     if not os.path.exists(model_dir):
         os.makedirs(model_dir)
-    torch.save(state, os.path.join(model_dir, model_filename))
+    torch.save(state, os.path.join(model_dir, args.model + '_' + train_time + '_' + model_filename))
 
 
 def load_model(args):

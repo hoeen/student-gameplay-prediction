@@ -13,6 +13,42 @@ except:
 def __init__():
     pass
 
+class DNN(nn.Module):
+    def __init__(self, args):
+        super(DNN, self).__init__()
+        self.args = args
+        self.init_n = None
+        self.max_seq_len = self.args.max_seq_len
+        self.col_len = len(self.args.num_cols) + len(self.args.cate_cols)
+        self.batch_size = self.args.batch_size
+
+        self.layer1 = nn.Linear(self.args.max_seq_len * self.col_len, 1024) 
+        self.layer2 = nn.Linear(1024, 128)
+        self.layer3 = nn.Linear(128, 64)
+        self.layer4 = nn.Linear(64, 18)
+
+        self.relu = nn.ReLU()
+        self.sigmoid = nn.Sigmoid()
+
+    def forward(self, input):
+        self.init_n = len(input[0])
+        input = torch.stack(input[:-1]) # mask 제외
+        batch_size = input[0].size(0)
+        x = self.layer1(input.contiguous().view(batch_size, -1))
+        x = self.relu(x)
+
+        x = self.layer2(x)
+        x = self.relu(x)
+
+        x = self.layer3(x)
+        x = self.relu(x)
+
+        x = self.layer4(x)
+        x = self.sigmoid(x)
+
+        return x
+        
+
 class LSTM(nn.Module):
     def __init__(self, args):
         super(LSTM, self).__init__()
@@ -21,17 +57,11 @@ class LSTM(nn.Module):
         self.hidden_dim = self.args.hidden_dim
         self.projection_dim = self.args.projection_dim
         self.n_layers = self.args.n_layers
+        self.lstm_hidden_dim = self.args.lstm_hidden_dim
+        self.cate_cols = self.args.cate_cols
+        self.num_cols = self.args.num_cols
 
-        # Embedding
-        # TODO: 각 feature에 맞는 embedding 구성하기
-        # interaction은 현재 correct로 구성되어있다. correct(1, 2) + padding(0)
-        # self.embedding_interaction = nn.Embedding(3, self.hidden_dim // 3)
-        # self.embedding_test = nn.Embedding(self.args.n_test + 1, self.hidden_dim // 3)
-        # self.embedding_question = nn.Embedding(
-        #     self.args.n_questions + 1, self.hidden_dim // 3
-        # )
-        # self.embedding_tag = nn.Embedding(self.args.n_tag + 1, self.hidden_dim // 3)
-        
+        # embedding
         for cat_col in self.args.cate_cols:
             setattr(self,
                     'embedding_' + cat_col,
@@ -40,21 +70,40 @@ class LSTM(nn.Module):
         
         
         # embedding combination projection
-        self.comb_proj = nn.Linear(self.hidden_dim * len(self.args.cate_cols), self.projection_dim - len(self.args.num_cols))
-
+        self.cat_proj = nn.Linear(self.hidden_dim * len(self.args.cate_cols), 
+                                   self.projection_dim // 2)
+        
+        
+        if self.args.cate_cols:
+            # layer normalization
+            self.layernorm = nn.LayerNorm(self.projection_dim // 2)
+            self.num_proj = nn.Linear(len(self.args.num_cols), 
+                                  self.projection_dim // 2)
+        else: 
+            # layer normalization
+            self.layernorm = nn.LayerNorm(self.projection_dim)
+            self.num_proj = nn.Linear(len(self.args.num_cols), 
+                                  self.projection_dim)
+            
         # comb_proj + len(num_cols) into model
         self.lstm = nn.LSTM(
-            self.input_dim, self.projection_dim, self.n_layers, batch_first=True
+            self.projection_dim, self.lstm_hidden_dim, self.n_layers, batch_first=True
         )
 
+        
+
         # Fully connected layer
-        self.fc = nn.Linear(self.projection_dim * self.args.max_seq_len, 128) # 맞춰야할 문제수
+        self.fc = nn.Linear(self.lstm_hidden_dim * self.args.max_seq_len, 128) # 맞춰야할 문제수
         self.fca = nn.Linear(128, 18)
+        self.activation = nn.Sigmoid()
     
     def forward(self, input):
         
         # input 형태 : ['elapsed_time', 'level', 'event_name', 'name', 'fqid', 'room_fqid', 'text_fqid']
-        cate_data = input[2:]
+        # a = len(self.args.cate_cols)
+        a = len(self.num_cols)
+        num_data = input[:a]  # 왜 a 대신 len(self.num_cols)로 하면 안되는건지?
+        cate_data = input[a:-1] # mask 제외
         # test, question, tag, _, mask, interaction = input
 
         # batch_size = interaction.size(0)
@@ -62,21 +111,26 @@ class LSTM(nn.Module):
 
         # Embedding
         # embed_event_name = self.embedding_event_name(event_name) 형식 
-        # concat all categorical 
-        embed = torch.cat(
-            [getattr(self, 'embedding_' + cat_col)(cate_data[i]) for i, cat_col in enumerate(self.args.cate_cols)],
-            2,
-        )
-
-        X = self.comb_proj(embed)
         
-        # 연속형 변수를 앞에 concat
-        # TODO: 연속형 변수 embedding 해야할지 말지.. 
-        X = torch.cat([input[0].unsqueeze(-1), input[1].unsqueeze(-1), X], -1)
+        # categorical embedding
+        # concat all categorical + numerical
+        num_data = torch.stack(num_data, 2) # list to tensor
+        num_X = self.layernorm(self.num_proj(num_data))
+
+        if self.cate_cols:
+            cat_embed = torch.cat(
+                [getattr(self, 'embedding_' + cat_col)(cate_data[i]) for i, cat_col in enumerate(self.cate_cols)],
+                2,
+            )
+            cat_X = self.layernorm(self.cat_proj(cat_embed))
+            X = torch.cat([num_X, cat_X], -1)
+        else: X = num_X
+        
         out, _ = self.lstm(X)
-        out = out.contiguous().view(batch_size, -1, self.projection_dim)
-        out = self.fc(out.flatten(1))
+        out = out.contiguous().view(batch_size, -1)
+        out = self.fc(out)
         out = self.fca(out)
+        out = self.activation(out)
         return out
 
 

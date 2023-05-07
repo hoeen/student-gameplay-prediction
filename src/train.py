@@ -1,7 +1,7 @@
 import os
 
 import torch
-# import wandb
+import wandb
 from args import parse_args
 from models import trainer
 from data.dataloader import Preprocess, get_target
@@ -12,7 +12,7 @@ def main(args):
     # wandb.login()
 
     setSeeds(args.seed)
-    args.device = "cuda" if torch.cuda.is_available() else "cpu"
+    args.device = "mps" if torch.cuda.is_available() else "cpu"
     
     preprocess = Preprocess(args)
     preprocess.load_train_data(args.file_name)
@@ -23,7 +23,7 @@ def main(args):
     # preprocess 진행 여부 판단
     train_data, train_target, valid_data, valid_target = preprocess.split_data(train_data, target_data)
     
-    # wandb.init(project="dkt", config=vars(args))
+    # wandb.init(project="gameplay", config=vars(args))
     model = trainer.get_model(args).to(args.device)
     trainer.run(args, train_data, valid_data, train_target, valid_target, model)
 

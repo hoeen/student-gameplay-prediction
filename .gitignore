@@ -6,3 +6,4 @@ __pycache__/
 .gitkeep
 launch.json
 
+.DS_Store
