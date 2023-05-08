@@ -1,5 +1,5 @@
 import os
-
+import platform
 import torch
 import wandb
 from args import parse_args
@@ -12,7 +12,12 @@ def main(args):
     # wandb.login()
 
     setSeeds(args.seed)
-    args.device = "mps" if torch.cuda.is_available() else "cpu"
+    
+    if platform.system() == 'Linux':
+        args.device = "cuda" if torch.cuda.is_available() else "cpu"
+    elif platform.system() == 'Darwin':
+        args.device = "mps" if torch.cuda.is_available() else "cpu"
+    
     
     preprocess = Preprocess(args)
     preprocess.load_train_data(args.file_name)

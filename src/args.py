@@ -1,23 +1,32 @@
 import argparse
-
+import platform
 
 def parse_args():
+
+    if platform.system() == 'Linux':
+        DIR = "/home/wooseok/Python_lab/kaggle/gameplay/student-gameplay-prediction/"
+    elif platform.system() == 'Darwin':
+        DIR = "/Users/wooseokpark/github/kaggle/student-gameplay-prediction/"
+
     parser = argparse.ArgumentParser()
 
     parser.add_argument("--seed", default=42, type=int, help="seed")
 
     parser.add_argument("--device", default="cpu", type=str, help="cpu or gpu")
 
+    
     # Data
     parser.add_argument(
         "--data_dir",
-        default="/Users/wooseokpark/github/kaggle/student-gameplay-prediction/data/raw/input/",
+        default= DIR + "data/raw/input/",
         type=str,
         help="data directory",
     )
     
     parser.add_argument(
-        "--processed_dir", default="/Users/wooseokpark/github/kaggle/student-gameplay-prediction/data/processed/", type=str, help="processed data directory"
+        "--processed_dir", 
+        default= DIR + "data/processed/",
+        type=str, help="processed data directory"
     )
 
     parser.add_argument(

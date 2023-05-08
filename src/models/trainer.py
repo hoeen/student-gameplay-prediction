@@ -112,9 +112,9 @@ def train(train_loader, model, optimizer, scheduler, args):
     total_targets = torch.concat(total_targets).cpu().numpy()
 
     # Train AUC / ACC
-    f1, auc, acc = get_metric(total_targets, total_preds)
+    f1, pre, rec, auc, acc = get_metric(total_targets, total_preds)
     loss_avg = sum(losses) / len(losses)
-    print(f"TRAIN F1: {f1} AUC : {auc} ACC : {acc}")
+    print(f"TRAIN F1: {f1} precision: {pre} recall: {rec} AUC : {auc} ACC : {acc}")
     return f1, auc, acc, loss_avg
 
 # TODO: validate with target
@@ -138,9 +138,9 @@ def validate(valid_loader, model, args):
     total_targets = torch.concat(total_targets).cpu().numpy()
 
     # Train AUC / ACC
-    f1, auc, acc = get_metric(total_targets, total_preds)
+    f1, pre, rec, auc, acc = get_metric(total_targets, total_preds)
 
-    print(f"VALID F1: {f1} AUC : {auc} ACC : {acc}")
+    print(f"VALID F1: {f1} precision: {pre} recall: {rec} AUC : {auc} ACC : {acc}")
 
     return f1, auc, acc
 
