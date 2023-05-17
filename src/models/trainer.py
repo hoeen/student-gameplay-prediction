@@ -145,36 +145,46 @@ def validate(valid_loader, model, args):
     return f1, auc, acc
 
 
-def inference(args, test_data, model):
+def inference(test_data, test_target, model, args):
 
     model.eval()
-    _, test_loader = get_loaders(args, None, test_data)
+    _, test_loader = get_loaders(args, None, test_data, None, test_target)
 
     total_preds = []
-
-    for step, batch in enumerate(test_loader):
+    total_targets = []
+    for step, (batch, target) in enumerate(test_loader):
         input = list(map(lambda t: t.to(args.device), process_batch(batch)))
 
         preds = model(input)
 
-        # predictions 시작
-        preds = preds[:, -1]
+        target = torch.Tensor(target)
 
-        ## sigmoid 추가
-        preds_sig = torch.nn.Sigmoid()
-        preds = preds_sig(preds)
+        total_preds.append(preds.detach())
+        total_targets.append(target)
+
+        # ## sigmoid 추가
+        # preds_sig = torch.nn.Sigmoid()
+        # preds = preds_sig(preds)
         
-        preds = preds.cpu().detach().numpy()
-        total_preds += list(preds)
-        # predictions 끝 
+        # preds = preds.cpu().detach().numpy()
+        # total_preds += list(preds)
+        
 
-    write_path = os.path.join(args.output_dir, "submission.csv")
-    if not os.path.exists(args.output_dir):
-        os.makedirs(args.output_dir)
-    with open(write_path, "w", encoding="utf8") as w:
-        w.write("id,prediction\n")
-        for id, p in enumerate(total_preds):
-            w.write("{},{}\n".format(id, p))
+    total_preds = torch.concat(total_preds).cpu().numpy()
+    total_targets = torch.concat(total_targets).cpu().numpy()
+    
+    # Train AUC / ACC
+    f1, pre, rec, auc, acc = get_metric(total_targets, total_preds)
+
+    print(f"TEST F1: {f1} precision: {pre} recall: {rec} AUC : {auc} ACC : {acc}")
+
+    # write_path = os.path.join(args.output_dir, "submission.csv")
+    # if not os.path.exists(args.output_dir):
+    #     os.makedirs(args.output_dir)
+    # with open(write_path, "w", encoding="utf8") as w:
+    #     w.write("id,prediction\n")
+    #     for id, p in enumerate(total_preds):
+    #         w.write("{},{}\n".format(id, p))
 
 
 def get_model(args):
@@ -187,7 +197,7 @@ def get_model(args):
         model = LSTMATTN(args)
     if args.model == "bert":
         model = Bert(args)
-    if args.model == 'DNN':
+    if args.model == 'dnn':
         model = DNN(args)
 
     return model
@@ -239,10 +249,10 @@ def save_checkpoint(state, model_dir, model_filename, train_time, args):
 
 
 def load_model(args):
-
     model_path = os.path.join(args.model_dir, args.model_name)
     print("Loading Model from:", model_path)
     load_state = torch.load(model_path)
+    args.model = args.model_name.split('_')[0]
     model = get_model(args)
 
     # load model state

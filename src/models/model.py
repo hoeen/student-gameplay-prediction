@@ -65,8 +65,8 @@ class LSTM(nn.Module):
         for cat_col in self.args.cate_cols:
             setattr(self,
                     'embedding_' + cat_col,
-                    nn.Embedding(getattr(self.args, 'input_size_'+cat_col) + 1, self.hidden_dim)       
-            )
+                    nn.Embedding(getattr(self.args, 'input_size_'+cat_col) + 2, self.hidden_dim)       
+            )       # 원래 +1 이었는데 unknown value까지 생각해서 +2로 바꿈
         
         
         # embedding combination projection

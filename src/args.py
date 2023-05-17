@@ -101,6 +101,11 @@ def parse_args():
         "--log_steps", default=50, type=int, help="print log per n steps"
     )
 
+    # 추론
+    parser.add_argument(
+        "--submission", default=0, type=int, help="to submit"
+    )
+
     ### 중요 ###
     parser.add_argument("--model", default="lstm", type=str, help="model type")
     parser.add_argument("--optimizer", default="adam", type=str, help="optimizer type")

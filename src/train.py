@@ -18,21 +18,37 @@ def main(args):
     elif platform.system() == 'Darwin':
         args.device = "mps" if torch.cuda.is_available() else "cpu"
     
-    
     preprocess = Preprocess(args)
-    preprocess.load_train_data(args.file_name)
-    train_data = preprocess.get_train_data() # train_data에는 user_id별로 모아놓은 데이터 존재.
+    ## Training
+    if not args.submission:
+        preprocess.load_train_test_data(args.file_name, is_train=True)
+    ## Inference
+    else:
+        preprocess.load_train_test_data(args.file_name, is_train=False)
     
-    target_data = get_target(args)
+    train_data, valid_data, test_data = preprocess.get_train_test_data() # train_data에는 user_id별로 모아놓은 데이터 존재.
+    
+    if not args.submission:
+        train_target, valid_target, test_target = get_target(args, is_train=True)
+    else:
+        train_target, test_target = get_target(args, is_train=False)
+    
 
-    # preprocess 진행 여부 판단
-    train_data, train_target, valid_data, valid_target = preprocess.split_data(train_data, target_data)
+    # train_data, train_target, valid_data, valid_target = preprocess.split_data(args, train_data, target_data)
+    ## Training
     
     # wandb.init(project="gameplay", config=vars(args))
     model = trainer.get_model(args).to(args.device)
-    trainer.run(args, train_data, valid_data, train_target, valid_target, model)
+    
 
+    if not args.submission:
+        trainer.run(args, train_data, valid_data, train_target, valid_target, model)
+        # test로 검증
+        trainer.inference(test_data, test_target, model, args)
+    else: # model for submission
+        trainer.run(args, train_data, test_data, train_target, test_target, model)
 
+        
 if __name__ == "__main__":
     args = parse_args()
     os.makedirs(args.model_dir, exist_ok=True)

@@ -5,9 +5,11 @@ from datetime import datetime
 
 import numpy as np
 import pandas as pd
+import polars as pl
 import torch
 import tqdm
 from sklearn.preprocessing import OrdinalEncoder, RobustScaler
+from sklearn.model_selection import train_test_split
 
 import pickle
 
@@ -22,13 +24,10 @@ class Preprocess:
         self.num_cols = self.args.num_cols # ['elapsed_time', 'level']
         self.cate_cols = self.args.cate_cols # ['event_name', 'name', 'fqid', 'room_fqid', 'text_fqid']
         
-    def get_train_data(self):
-        return self.train_data
+    def get_train_test_data(self):
+        return self.train_data, self.eval_data, self.test_data
 
-    def get_test_data(self):
-        return self.test_data
-
-    def split_data(self, data, target, ratio=0.7, shuffle=True, seed=0):
+    def split_data(self, args, data, target, ratio=0.8, shuffle=True, seed=0):
         """
         split data into two parts with a given ratio.
         """
@@ -36,76 +35,127 @@ class Preprocess:
             random.seed(seed)  # fix to default seed 0
             random.shuffle(data)
 
+
         size = int(len(data) * ratio)
         data_1 = data[:size]
-        data_2 = data[size:]
+        data_2 = data[size:size + (len(data)-size)//2]
+        test_data = data[size + (len(data)-size)//2:] # eval 을 둘로나눠 eval, test로 함
 
         target_1 = target[:size]
-        target_2 = target[size:]
+        target_2 = target[size:size + (len(data)-size)//2]
+        test_target= target[size + (len(data)-size)//2:]
 
+        args.test_data = test_data
+        args.test_target = test_target
         return data_1, target_1, data_2, target_2
 
-    def __save_labels(self, encoder, name):
-        le_path = os.path.join(self.args.processed_dir, name + "_classes.npy")
-        np.save(le_path, encoder.categories_[0])
+    def __save_labels(self, encoder):
+        for col_idx in range(len(self.cate_cols)):
+            le_path = os.path.join(self.args.processed_dir, self.cate_cols[col_idx] + "_classes.npy")
+            np.save(le_path, encoder.categories_[col_idx])
     
     def __save_scaler(self, scaler):
         sc_path = os.path.join(self.args.processed_dir, "cont_scaler.pkl")
         with open(sc_path, 'wb') as f:
             pickle.dump(scaler, f) # scaler 자체를 저장
+
+    def __save_encoder(self, encoder):
+        sc_path = os.path.join(self.args.processed_dir, "ord_encoder.pkl")
+        with open(sc_path, 'wb') as f:
+            pickle.dump(encoder, f) # scaler 자체를 저장
     
     
     @logging_time
     def __preprocessing(self, df, is_train=True):
-        
-        # ordinal encoding
-        for col in self.cate_cols:
-            if is_train:   #train
-                le = OrdinalEncoder()
-                # For UNKNOWN class
-                le.fit(df[[col]])
-                self.__save_labels(le, col)
-            else:  #inference
-                label_path = os.path.join(self.args.processed_dir, col + "_classes.npy")
-                le.categories_[0] = np.load(label_path, allow_pickle=True)
+        # train-eval split
+        train_idx, eval_idx = train_test_split(df['session_id'].unique(), train_size=0.8)
+        eval_idx, test_idx = train_test_split(eval_idx, train_size=0.5) # 0.1 / 0.1 로 eval, test 나눔
 
-            test = le.transform(df[[col]])
-            df[col] = test
-            
-        # scaling - using Robustscaling because of outliers in elapsedtime
-        # self.num_cols
         if is_train:
+            train_df = df.set_index('session_id').loc[train_idx].reset_index()
+            eval_df = df.set_index('session_id').loc[eval_idx].reset_index()
+            test_df = df.set_index('session_id').loc[test_idx].reset_index()
+            le = OrdinalEncoder(handle_unknown='use_encoded_value', unknown_value=-1)
+            # For UNKNOWN class
+            le.fit(train_df[self.cate_cols])
+            self.__save_encoder(le)
+            self.__save_labels(le)
+            
+             # scaling - using Robustscaling because of outliers in elapsedtime
             scaler = RobustScaler()
-            scaler.fit(df[self.num_cols])
+            scaler.fit(train_df[self.num_cols])
             self.__save_scaler(scaler)
+            
+            train_df[self.cate_cols] = le.transform(train_df[self.cate_cols])
+            train_df[self.num_cols] = scaler.transform(train_df[self.num_cols])
+            
+            eval_df[self.cate_cols] = le.transform(eval_df[self.cate_cols])
+            eval_df[self.num_cols] = scaler.transform(eval_df[self.num_cols])
 
-        else:  #inference
+            test_df[self.cate_cols] = le.transform(test_df[self.cate_cols])
+            test_df[self.num_cols] = scaler.transform(test_df[self.num_cols])
+            
+            return train_df, eval_df, test_df
+
+        else: # inference
+            train_df = df.set_index('session_id').loc[np.concatenate([train_idx, eval_idx])].reset_index()
+            test_df = df.set_index('session_id').loc[test_idx].reset_index()
+
+            encoder_path = os.path.join(self.args.processed_dir, "ord_encoder.pkl")
+            with open(encoder_path, 'rb') as f:
+                le = pickle.load(f)
+            
             label_path = os.path.join(self.args.processed_dir, "cont_scaler.pkl")
             with open(label_path, 'rb') as f:
                 scaler = pickle.load(f)
-        
-        df[self.num_cols] = scaler.transform(df[self.num_cols])
-        
 
-        return df
+            train_df[self.cate_cols] = le.transform(train_df[self.cate_cols])
+            train_df[self.num_cols] = scaler.transform(train_df[self.num_cols])
+            
+            test_df[self.cate_cols] = le.transform(test_df[self.cate_cols])
+            test_df[self.num_cols] = scaler.transform(test_df[self.num_cols])
+            
+            return train_df, None, test_df
+        
+        
+        
 
     def __feature_engineering(self, df):
         # TODO
+        # 실험 : df를 제한된 양으로만 - 인코딩이 제대로 안되도록
+        # df = df.iloc[:1000]
         return df
 
     def load_data_from_file(self, file_name, is_train=True, processed=False):
         csv_file_path = os.path.join(self.args.data_dir, file_name)
-        proc_file_path = os.path.join(self.args.processed_dir, file_name)
+        proc_train_path = os.path.join(self.args.processed_dir, 'train.parquet')
+        proc_eval_path = os.path.join(self.args.processed_dir, 'eval.parquet')
+        proc_train_inf_path = os.path.join(self.args.processed_dir, 'train_inf.parquet')
+        proc_test_path = os.path.join(self.args.processed_dir, 'test.parquet')
         
+        # 훈련 - train, eval / 추론 - train_inf, test
         if not processed:
             df = pd.read_parquet(csv_file_path)  # , nrows=100000)
             df = self.__feature_engineering(df)
-            df = self.__preprocessing(df, is_train)
-            df.to_parquet(proc_file_path)
+            train_df, eval_df, test_df = self.__preprocessing(df, is_train)
+            if is_train:
+                train_df.to_parquet(proc_train_path)
+                eval_df.to_parquet(proc_eval_path)
+                test_df.to_parquet(proc_test_path)
+            else:
+                train_df.to_parquet(proc_train_inf_path)
+                test_df.to_parquet(proc_test_path)
+        
         else:
-            df = pd.read_parquet(proc_file_path)
-        
-        
+            if is_train:
+                train_df = pd.read_parquet(proc_train_path)
+                eval_df = pd.read_parquet(proc_eval_path)
+                test_df = pd.read_parquet(proc_test_path)
+            else:
+                train_df = pd.read_parquet(proc_train_inf_path)
+                test_df = pd.read_parquet(proc_test_path)
+
+
 
         # 추후 feature를 embedding할 시에 embedding_layer의 input 크기를 결정할때 사용
         self.args.cate_cols = self.cate_cols
@@ -117,37 +167,67 @@ class Preprocess:
                     'input_size_'+cate, 
                     len(np.load(os.path.join(self.args.processed_dir, cate + "_classes.npy"), allow_pickle=True)) 
             )
-        
-
+        if is_train:
+            return train_df, eval_df, test_df
+        else:
+            return train_df, None, test_df
+    
+    def groupby_session(self, df):
         # df = df.sort_values(by=["userID", "Timestamp"], axis=0)
         columns = ["session_id"] + self.num_cols + self.cate_cols
         group = (
             df.groupby("session_id")
             .apply(
                 lambda r: tuple([r[col].values for col in columns[1:]])
+                # lambda r: tuple([r[col].values[:1] for col in columns[1:]])
             )
         )
-
         return group.values
 
-    def load_train_data(self, file_name):
-        self.train_data = self.load_data_from_file(file_name, processed=self.args.processed)
+    def load_train_test_data(self, file_name, is_train=True):
+        train_df, eval_df, test_df = self.load_data_from_file(file_name, is_train=is_train, processed=self.args.processed)
+        self.train_data = self.groupby_session(train_df)
+        self.test_data = self.groupby_session(test_df)
+        # save to args
+        self.args.train_session = train_df['session_id'].values
+        self.args.test_session = test_df['session_id'].values
+        if is_train:
+            self.eval_data = self.groupby_session(eval_df)
+            self.args.eval_session = eval_df['session_id'].values
+        else:
+            self.eval_data = None
 
     def load_test_data(self, file_name):
         self.test_data = self.load_data_from_file(file_name, is_train=False, processed=True)
 
 
-def get_target(args): # target 데이터 가져옴
+def get_target(args, is_train=True): # target 데이터 가져옴
     file_path = os.path.join(args.data_dir, args.target_name)
+    # using polars to boost the speed
     label_df = pd.read_csv(file_path)
     # 1~18 target data by user
     # code from: https://www.kaggle.com/code/dungdore1312/session-info-as-sequence-use-lstm-to-predict/notebook
     label_df['session'] = label_df.session_id.apply(lambda x: int(x.split('_')[0]) )
     label_df['question_idx'] = label_df.session_id.apply(lambda x: int(x.split('_')[-1][1:]) )
-    label_df.drop("session_id", axis=1, inplace=True)
-    pivoted_questions = label_df.pivot(columns='question_idx', values='correct', index='session')
+
+    # train, test 따로 가져오기
+    label_pl = pl.DataFrame(label_df)
+    train_target = label_pl.filter(pl.col('session').is_in(args.train_session)).to_pandas()
+    test_target = label_pl.filter(pl.col('session').is_in(args.test_session)).to_pandas()
+
+    train_target.drop("session_id", axis=1, inplace=True)
+    test_target.drop("session_id", axis=1, inplace=True)
+
+    train_target = train_target.pivot(columns='question_idx', values='correct', index='session')
+    test_target = test_target.pivot(columns='question_idx', values='correct', index='session')
     
-    return pivoted_questions.values
+    if not is_train:
+        return train_target.values, test_target.values
+    else:
+        eval_target = label_pl.filter(pl.col('session').is_in(args.eval_session)).to_pandas()
+        eval_target.drop("session_id", axis=1, inplace=True)
+        eval_target = eval_target.pivot(columns='question_idx', values='correct', index='session')
+        return train_target.values, eval_target.values, test_target.values
 
 class DKTDataset(torch.utils.data.Dataset):
     def __init__(self, data, target, args):
@@ -204,9 +284,7 @@ def collate(batch):
 
     for i, _ in enumerate(col_list):
         col_list[i] = torch.stack(col_list[i])
-    # 실험 1 : max_seq_len (20)마다 18개의 답을 내도록 
-    # 실험 2 : max_seq_len을 유저의 모든 로그 길이보다 크게 
-    # 결론 : max_seq_len = 2000으로 설정하여 그 이상 데이터는 DKTDataset에서 잘라버림
+    # max_seq_len = 2000으로 설정하여 그 이상 데이터는 DKTDataset에서 잘라버림
     return tuple(col_list), tuple([b[1] for b in batch])
 
 def get_loaders(args, train, valid, train_target, valid_target):
