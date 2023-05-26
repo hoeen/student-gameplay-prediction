@@ -51,16 +51,16 @@ class Preprocess:
 
     def __save_labels(self, encoder):
         for col_idx in range(len(self.cate_cols)):
-            le_path = os.path.join(self.args.processed_dir, self.cate_cols[col_idx] + "_classes.npy")
+            le_path = os.path.join(self.args.processed_dir, self.cate_cols[col_idx] + "_classes_"+str(self.args.level_group)+".npy")
             np.save(le_path, encoder.categories_[col_idx])
     
     def __save_scaler(self, scaler):
-        sc_path = os.path.join(self.args.processed_dir, "cont_scaler.pkl")
+        sc_path = os.path.join(self.args.processed_dir, "cont_scaler_"+str(self.args.level_group)+".pkl")
         with open(sc_path, 'wb') as f:
             pickle.dump(scaler, f) # scaler 자체를 저장
 
     def __save_encoder(self, encoder):
-        sc_path = os.path.join(self.args.processed_dir, "ord_encoder.pkl")
+        sc_path = os.path.join(self.args.processed_dir, "ord_encoder_"+str(self.args.level_group)+".pkl")
         with open(sc_path, 'wb') as f:
             pickle.dump(encoder, f) # scaler 자체를 저장
     
@@ -68,7 +68,7 @@ class Preprocess:
     @logging_time
     def __preprocessing(self, df, is_train=True):
         # train-eval split
-        train_idx, eval_idx = train_test_split(df['session_id'].unique(), train_size=0.8)
+        train_idx, eval_idx = train_test_split(df['session_id'].unique(), train_size=self.args.train_size)
         eval_idx, test_idx = train_test_split(eval_idx, train_size=0.5) # 0.1 / 0.1 로 eval, test 나눔
 
         if is_train:
@@ -101,11 +101,11 @@ class Preprocess:
             train_df = df.set_index('session_id').loc[np.concatenate([train_idx, eval_idx])].reset_index()
             test_df = df.set_index('session_id').loc[test_idx].reset_index()
 
-            encoder_path = os.path.join(self.args.processed_dir, "ord_encoder.pkl")
+            encoder_path = os.path.join(self.args.processed_dir, "ord_encoder_"+str(self.args.level_group)+".pkl")
             with open(encoder_path, 'rb') as f:
                 le = pickle.load(f)
             
-            label_path = os.path.join(self.args.processed_dir, "cont_scaler.pkl")
+            label_path = os.path.join(self.args.processed_dir, "cont_scaler_"+str(self.args.level_group)+".pkl")
             with open(label_path, 'rb') as f:
                 scaler = pickle.load(f)
 
@@ -116,27 +116,18 @@ class Preprocess:
             test_df[self.num_cols] = scaler.transform(test_df[self.num_cols])
             
             return train_df, None, test_df
-        
-        
-        
-
-    def __feature_engineering(self, df):
-        # TODO
-        # 실험 : df를 제한된 양으로만 - 인코딩이 제대로 안되도록
-        # df = df.iloc[:1000]
-        return df
 
     def load_data_from_file(self, file_name, is_train=True, processed=False):
         csv_file_path = os.path.join(self.args.data_dir, file_name)
-        proc_train_path = os.path.join(self.args.processed_dir, 'train.parquet')
-        proc_eval_path = os.path.join(self.args.processed_dir, 'eval.parquet')
-        proc_train_inf_path = os.path.join(self.args.processed_dir, 'train_inf.parquet')
-        proc_test_path = os.path.join(self.args.processed_dir, 'test.parquet')
+        proc_train_path = os.path.join(self.args.processed_dir, 'train_group' + str(self.args.level_group) + '.parquet')
+        proc_eval_path = os.path.join(self.args.processed_dir, 'eval_group' + str(self.args.level_group) + '.parquet')
+        proc_train_inf_path = os.path.join(self.args.processed_dir, 'train_inf_group' + str(self.args.level_group) +'.parquet')
+        proc_test_path = os.path.join(self.args.processed_dir, 'test_group' + str(self.args.level_group) + '.parquet')
         
         # 훈련 - train, eval / 추론 - train_inf, test
         if not processed:
             df = pd.read_parquet(csv_file_path)  # , nrows=100000)
-            df = self.__feature_engineering(df)
+            df = feature_engineering(self.args, df, which='data')
             train_df, eval_df, test_df = self.__preprocessing(df, is_train)
             if is_train:
                 train_df.to_parquet(proc_train_path)
@@ -165,7 +156,7 @@ class Preprocess:
             # self.args.cate 로 지정
             setattr(self.args, 
                     'input_size_'+cate, 
-                    len(np.load(os.path.join(self.args.processed_dir, cate + "_classes.npy"), allow_pickle=True)) 
+                    len(np.load(os.path.join(self.args.processed_dir, cate + "_classes_"+str(self.args.level_group)+".npy"), allow_pickle=True)) 
             )
         if is_train:
             return train_df, eval_df, test_df
@@ -179,7 +170,7 @@ class Preprocess:
             df.groupby("session_id")
             .apply(
                 lambda r: tuple([r[col].values for col in columns[1:]])
-                # lambda r: tuple([r[col].values[:1] for col in columns[1:]])
+                # lambda r: tuple([r[col].values[:0] for col in columns[1:]])
             )
         )
         return group.values
@@ -200,6 +191,23 @@ class Preprocess:
     def load_test_data(self, file_name):
         self.test_data = self.load_data_from_file(file_name, is_train=False, processed=True)
 
+def feature_engineering(args, df, which='data'): # which : data / label
+    # 선택한 level에 따른 data만 가져오기
+    group_dic = {
+        1: ('0-4', '1-3'), 
+        2: ('5-12', '4-13'),
+        3: ('13-22', '14-18')
+    }
+    group_level, question_range = group_dic[args.level_group]
+    if which == 'data':
+        df['elapsed_time'] = df.groupby('session_id')['elapsed_time'].apply(lambda x: x - x.shift(1))
+        df = df.loc[df.level_group == group_level]
+        df['elapsed_time'] = df['elapsed_time'].fillna(0)
+    else:
+        qstart, qend = map(int, question_range.split('-'))
+        df = df.loc[df.question_idx.isin(range(qstart, qend+1))]
+    
+    return df
 
 def get_target(args, is_train=True): # target 데이터 가져옴
     file_path = os.path.join(args.data_dir, args.target_name)
@@ -209,6 +217,8 @@ def get_target(args, is_train=True): # target 데이터 가져옴
     # code from: https://www.kaggle.com/code/dungdore1312/session-info-as-sequence-use-lstm-to-predict/notebook
     label_df['session'] = label_df.session_id.apply(lambda x: int(x.split('_')[0]) )
     label_df['question_idx'] = label_df.session_id.apply(lambda x: int(x.split('_')[-1][1:]) )
+
+    label_df = feature_engineering(args, label_df, which='label')
 
     # train, test 따로 가져오기
     label_pl = pl.DataFrame(label_df)

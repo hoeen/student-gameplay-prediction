@@ -46,13 +46,18 @@ def parse_args():
     )
 
     parser.add_argument(
-        "--num_cols", default=['elapsed_time', 'level'], type=list, help="numeric(continuous) columns"
+        "--num_cols", default='elapsed_time level', type=str, help="numeric(continuous) columns"
     )
     
     parser.add_argument(
-        "--cate_cols", default=['event_name', 'name', 'fqid', 'room_fqid', 'text_fqid'], type=list, help="categorical columns"
+        "--cate_cols", default='event_name name fqid room_fqid text_fqid', type=str, help="categorical columns"
     )
 
+    parser.add_argument(
+        "--level_group", default=1, type=int, help="select level_group to train. 1: 0-4(q1-3), 2: 5-12(q4-13), 3: 13-22(q14-18)"
+    )
+    
+    parser.add_argument("--train_size", default=0.8, type=float, help="train size")
 
     # model
     parser.add_argument(
@@ -112,6 +117,12 @@ def parse_args():
     parser.add_argument(
         "--scheduler", default="plateau", type=str, help="scheduler type"
     )
+
+    ## wandb
+    parser.add_argument(
+        "--wandb", default=1, type=int, help="turn on wandb"
+    )
+
 
     args = parser.parse_args()
 

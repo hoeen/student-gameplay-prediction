@@ -29,6 +29,7 @@ def run(args, train_data, valid_data, train_target, valid_target, model):
     scheduler = get_scheduler(optimizer, args)
 
     best_f1 = -1
+    # best_loss = float('inf')
     early_stopping_counter = 0
     train_time = datetime.today().strftime("%Y%m%d%H%M%S")
     for epoch in range(args.n_epochs):
@@ -44,20 +45,26 @@ def run(args, train_data, valid_data, train_target, valid_target, model):
         f1, auc, acc = validate(valid_loader, model, args)
 
         ### TODO: model save or early stopping
-        # wandb.log(
-        #     {
-        #         "epoch": epoch,
-        #         "train_loss_epoch": train_loss,
-        #         "train_f1_epoch": train_f1,
-        #         "train_auc_epoch": train_auc,
-        #         "train_acc_epoch": train_acc,
-        #         "valid_f1_epoch": f1,
-        #         "valid_auc_epoch": auc,
-        #         "valid_acc_epoch": acc,
-        #     }
-        # )
+        if args.wandb:
+            wandb.log(
+                {
+                    "epoch": epoch,
+                    "train_loss_epoch": train_loss,
+                    "train_f1_epoch": train_f1,
+                    "train_auc_epoch": train_auc,
+                    "train_acc_epoch": train_acc,
+                    "valid_f1_epoch": f1,
+                    "valid_auc_epoch": auc,
+                    "valid_acc_epoch": acc,
+                }
+            )
+       
         if f1 > best_f1:
             best_f1 = f1
+        # train loss 기준으로
+        # if train_loss < best_loss:
+        #     best_loss = train_loss
+            
             # torch.nn.DataParallel로 감싸진 경우 원래의 model을 가져옵니다.
             model_to_save = model.module if hasattr(model, "module") else model
             save_checkpoint(
@@ -82,6 +89,7 @@ def run(args, train_data, valid_data, train_target, valid_target, model):
         # scheduler
         if args.scheduler == "plateau":
             scheduler.step(best_f1)
+            # scheduler.step(train_loss)
 
 
 def train(train_loader, model, optimizer, scheduler, args):
@@ -114,7 +122,7 @@ def train(train_loader, model, optimizer, scheduler, args):
     # Train AUC / ACC
     f1, pre, rec, auc, acc = get_metric(total_targets, total_preds)
     loss_avg = sum(losses) / len(losses)
-    print(f"TRAIN F1: {f1} precision: {pre} recall: {rec} AUC : {auc} ACC : {acc}")
+    print(f"TRAIN Avg_Loss: {loss_avg} F1: {f1} precision: {pre} recall: {rec} AUC : {auc} ACC : {acc}")
     return f1, auc, acc, loss_avg
 
 # TODO: validate with target

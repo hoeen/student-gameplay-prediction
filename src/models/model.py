@@ -60,6 +60,9 @@ class LSTM(nn.Module):
         self.lstm_hidden_dim = self.args.lstm_hidden_dim
         self.cate_cols = self.args.cate_cols
         self.num_cols = self.args.num_cols
+        # questions 결정
+        qnum = [None, 3, 10, 5]
+        self.questions = qnum[self.args.level_group]
 
         # embedding
         for cat_col in self.args.cate_cols:
@@ -84,7 +87,10 @@ class LSTM(nn.Module):
             self.layernorm = nn.LayerNorm(self.projection_dim)
             self.num_proj = nn.Linear(len(self.args.num_cols), 
                                   self.projection_dim)
-            
+        
+        # batch normalization
+        self.batchnorm = nn.BatchNorm1d(self.projection_dim)
+
         # comb_proj + len(num_cols) into model
         self.lstm = nn.LSTM(
             self.projection_dim, self.lstm_hidden_dim, self.n_layers, batch_first=True
@@ -93,9 +99,12 @@ class LSTM(nn.Module):
         
 
         # Fully connected layer
-        self.fc = nn.Linear(self.lstm_hidden_dim * self.args.max_seq_len, 128) # 맞춰야할 문제수
-        self.fca = nn.Linear(128, 18)
+        # self.fc = nn.Linear(self.lstm_hidden_dim * self.args.max_seq_len, 128) # 맞춰야할 문제수
+        self.fc = nn.Linear(self.lstm_hidden_dim * self.args.max_seq_len, self.questions)
+        # self.fca = nn.Linear(128, self.questions)
+        # self.relu = nn.ReLU()
         self.activation = nn.Sigmoid()
+        self.dropout = nn.Dropout(0.8)
     
     def forward(self, input):
         
@@ -116,6 +125,7 @@ class LSTM(nn.Module):
         # concat all categorical + numerical
         num_data = torch.stack(num_data, 2) # list to tensor
         num_X = self.layernorm(self.num_proj(num_data))
+        # num_X = self.num_proj(num_data)
 
         if self.cate_cols:
             cat_embed = torch.cat(
@@ -123,13 +133,17 @@ class LSTM(nn.Module):
                 2,
             )
             cat_X = self.layernorm(self.cat_proj(cat_embed))
+            # cat_X = self.cat_proj(cat_embed)
             X = torch.cat([num_X, cat_X], -1)
         else: X = num_X
         
         out, _ = self.lstm(X)
+        # out = self.dropout(out)
         out = out.contiguous().view(batch_size, -1)
+        # out = self.relu(self.fc(out))
         out = self.fc(out)
-        out = self.fca(out)
+        # out = self.fca(out)
+        # out = self.dropout(out)
         out = self.activation(out)
         return out
 

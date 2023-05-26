@@ -9,7 +9,9 @@ from utils import setSeeds
 
 
 def main(args):
-    # wandb.login()
+
+    if args.wandb:
+        wandb.login()
 
     setSeeds(args.seed)
     
@@ -17,7 +19,19 @@ def main(args):
         args.device = "cuda" if torch.cuda.is_available() else "cpu"
     elif platform.system() == 'Darwin':
         args.device = "mps" if torch.cuda.is_available() else "cpu"
+
+    # num_cols, cate_cols
+    if args.num_cols:
+        args.num_cols = args.num_cols.split(' ')
+    else:
+        args.num_cols = []
     
+    if args.cate_cols:
+        args.cate_cols = args.cate_cols.split(' ')
+    else:
+        args.cate_cols = []
+    
+        
     preprocess = Preprocess(args)
     ## Training
     if not args.submission:
@@ -36,8 +50,8 @@ def main(args):
 
     # train_data, train_target, valid_data, valid_target = preprocess.split_data(args, train_data, target_data)
     ## Training
-    
-    # wandb.init(project="gameplay", config=vars(args))
+    if args.wandb:
+        wandb.init(project="gameplay", config=vars(args))
     model = trainer.get_model(args).to(args.device)
     
 
