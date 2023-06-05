@@ -1,4 +1,9 @@
+import warnings
+warnings.simplefilter(action='ignore', category=Warning)
+
 import pandas as pd
+pd.reset_option('all')
+
 import polars as pl
 import numpy as np
 
