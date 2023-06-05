@@ -1,11 +1,35 @@
 import pandas as pd
 import polars as pl
+import numpy as np
 
 # First model (Catboost)
 CATS = ['event_name', 'name', 'fqid', 'room_fqid', 'text_fqid']
 NUMS = ['page', 'room_coor_x', 'room_coor_y', 'screen_coor_x', 'screen_coor_y',
         'hover_duration', 'elapsed_time_diff']
 DIALOGS = ['that', 'this', 'it', 'you','find','found','Found','notebook','Wells','wells','help','need', 'Oh','Ooh','Jo', 'flag', 'can','and','is','the','to']
+
+COLUMNS = [
+    pl.col("page").cast(pl.Float32),
+    (
+        (pl.col("elapsed_time") - pl.col("elapsed_time").shift(1))
+        .fill_null(0)
+        .clip(0, 1e9)
+        .over(["session_id", "level"])
+        .alias("elapsed_time_diff")
+    ),
+    (
+        (pl.col("screen_coor_x") - pl.col("screen_coor_x").shift(1))
+        .abs()
+        .over(["session_id", "level"])
+    ),
+    (
+        (pl.col("screen_coor_y") - pl.col("screen_coor_y").shift(1))
+        .abs()
+        .over(["session_id", "level"])
+    ),
+    pl.col("fqid").fill_null("fqid_None"),
+    pl.col("text_fqid").fill_null("text_fqid_None")
+]
 
 name_feature = ['basic', 'undefined', 'close', 'open', 'prev', 'next']
 event_name_feature = ['cutscene_click', 'person_click', 'navigate_click',
@@ -522,9 +546,9 @@ def feature_engineer(x, grp, use_extra, feature_suffix):
           level_groups],
 
     ]
-    #df = x.groupby(['session_id']).agg(aggs).sort_values("session_id")
+    # df = x.groupby(['session_id']).agg(aggs).sort_values("session_id")
 
-    df = x.groupby(['session_id'], maintain_order=True).agg(aggs).sort("session_id")
+    df = x.with_columns(COLUMNS).groupby(['session_id'], maintain_order=True).agg(aggs).sort("session_id")
 
     if use_extra:
         if grp == '5-12':
@@ -582,13 +606,40 @@ def feature_engineer(x, grp, use_extra, feature_suffix):
     return df.to_pandas()
 
 def time_feature(train):
-    train["year"] = train["session_id"].apply(lambda x: int(str(x)[:2])).astype(np.uint8)
-    train["month"] = train["session_id"].apply(lambda x: int(str(x)[2:4])+1).astype(np.uint8)
-    train["day"] = train["session_id"].apply(lambda x: int(str(x)[4:6])).astype(np.uint8)
-    train["hour"] = train["session_id"].apply(lambda x: int(str(x)[6:8])).astype(np.uint8)
-    train["minute"] = train["session_id"].apply(lambda x: int(str(x)[8:10])).astype(np.uint8)
-    train["second"] = train["session_id"].apply(lambda x: int(str(x)[10:12])).astype(np.uint8)
-    return train
+    q = (
+        pl.from_pandas(train)
+          .lazy()
+          .with_columns([
+            pl.col("session_id").apply(lambda x: int(str(x)[:2])).alias('year'),#.astype(np.uint8)
+            pl.col("session_id").apply(lambda x: int(str(x)[2:4])+1).alias('month'),#.astype(np.uint8)
+            pl.col("session_id").apply(lambda x: int(str(x)[4:6])).alias('day'),#.astype(np.uint8)
+            pl.col("session_id").apply(lambda x: int(str(x)[6:8])).alias('hour'),#.astype(np.uint8)
+            pl.col("session_id").apply(lambda x: int(str(x)[8:10])).alias('minute'),#.astype(np.uint8)
+            pl.col("session_id").apply(lambda x: int(str(x)[10:12])).alias('second'),#.astype(np.uint8)
+            pl.col("session_id").apply(lambda x: int(str(x)[12:])).alias('id_anonymous'),#.astype(np.uint8)
+        ])
+    )
+    # train["year"] = train.with_columns("session_id").apply(lambda x: int(str(x)[:2]))#.astype(np.uint8)
+    # train["month"] = train["session_id"].apply(lambda x: int(str(x)[2:4])+1)#.astype(np.uint8)
+    # train["day"] = train["session_id"].apply(lambda x: int(str(x)[4:6]))#.astype(np.uint8)
+    # train["hour"] = train["session_id"].apply(lambda x: int(str(x)[6:8]))#.astype(np.uint8)
+    # train["minute"] = train["session_id"].apply(lambda x: int(str(x)[8:10]))#.astype(np.uint8)
+    # train["second"] = train["session_id"].apply(lambda x: int(str(x)[10:12]))#.astype(np.uint8)
+    # train["id_anonymous"] = train["session_id"].apply(lambda x: int(str(x)[12:]))#.astype(np.uint8)
+    
+    # time features
+    # df = pl.from_pandas(train)
+    # aggs = [
+    #     pl.col('session_id').apply(lambda x: int(str(x)[:2])).alias('year'),
+    #     pl.col('session_id').apply(lambda x: int(str(x)[2:4])+1).alias('month'),
+    #     pl.col('session_id').apply(lambda x: int(str(x)[4:6])).alias('day'),
+    #     pl.col('session_id').apply(lambda x: int(str(x)[6:8])).alias('hour'),
+    #     pl.col('session_id').apply(lambda x: int(str(x)[8:10])).alias('minute'),
+    #     pl.col('session_id').apply(lambda x: int(str(x)[10:12])).alias('second'),
+    #     pl.col('session_id').apply(lambda x: int(str(x)[12:])).alias('id_anonymous'),
+    # ]
+
+    return q.collect().to_pandas()
 
 
 def new_page(X, grp): 
@@ -610,6 +661,7 @@ def new_page(X, grp):
 
 # https://www.kaggle.com/code/glipko/recap-texts#Data-Extraction-
 def text_cnt(x, revised_train):
+    
     x['in_the_same_dialogue'] = x['text_fqid'].shift() # 한칸씩 뒤로
     x['in_the_same_dialogue'] = x['text_fqid'] == x['in_the_same_dialogue']
 
@@ -651,4 +703,209 @@ def text_cnt(x, revised_train):
     text_feature=pd.concat([session_recap,reading], axis=1)
     text_feature.columns=['recap_reading', 'reading_cnt']
     
-    return pd.merge(revised_train,text_feature, on='session_id', how='left').set_index('session_id')
+    revised_train = pd.merge(x, revised_train, on='session_id', how='left')
+
+    return pd.merge(revised_train, text_feature, on='session_id', how='left').set_index('session_id')
+
+
+def feature_quest(train, q):
+    train_q = train.copy()
+    texts = {
+        1: ["Yes! This cool old slip from 1916.", 
+             "Go ahead, take a peek at the shirt!", 
+             "I'll be at the Capitol. Let me know if you find anything!", 
+             "We need to talk about that missing paperwork.", 
+             "The slip is from 1916 but the team didn't start until 1974!"], 
+         2: ["It's already all done!", 
+             "Gramps is the best historian ever!"], 
+         3: ["I suppose historians are boring, too?" 
+             "Why don't you head to the Basketball Center and rustle up some clues?", 
+             "We need to talk about that missing paperwork."],    
+        
+         4: ['I need to find the owner of this slip.',
+             'She led marches and helped women get the right to vote!', 
+             "Here's a call number to find more info in the Stacks.", 
+             "What was Wells doing here?"],
+
+         5: ["Your gramps is awesome! Always full of stories.",
+             "Here's a call number to find more info in the Stacks.", 
+             "Where did you get that coffee?"],         
+        
+         6: ["Oh, that's from Bean Town.", 
+             "Wells? I knew it!"], 
+           
+         7: ["Try not to panic, Jo.",
+             "I've got a stack of business cards from my favorite cleaners.",
+             "Check out our microfiche. It's right through that door.", 
+             "I'm afraid my papers have gone missing in this mess.", 
+             "Nope. But Youmans and other suffragists worked hard to change that."], 
+            
+         8: ["What should I do first?",
+             "Thanks to them, Wisconsin was the first state to approve votes for women!"], 
+
+         9: [ "Can you help me? I need to find the owner of this slip.",
+             'Looks like a dry cleaning receipt.',
+             "I knew I could count on you, Jo!", 
+             "Nope, that's from Bean Town. I only drink Holdgers!"], 
+
+         10:["I love these photos of me and Teddy."
+             'Your gramps is awesome! Always full of stories.',
+             "Nope. But Youmans and other suffragists worked hard to change that.", 
+             "Right outside the door.", 
+             "Do you have any info on Theodora Youmans?"], 
+                   
+         11:["I ran into Wells there this morning",
+             'Your gramps is awesome! Always full of stories.',
+             "Wait a sec. Women couldn't vote?!", 
+             "I've got a stack of business cards from my favorite cleaners.",
+             "An old shirt? Try the university."],  
+         12:[],
+         13:[],        
+         14:[],
+         15:[],
+         16:[],
+         17:[],
+         18:[]
+        }
+    i = 0
+    for text in texts[q]:
+        i += 1
+        train_q['text' + str(i)] = train[train['text'] == text].groupby(['session_id'])['delt_time'].sum()
+    
+    fqids = {
+         1: ['directory'], 
+         2: ['notebook','chap1_finale_c'], 
+         3: ['tostacks','doorblock'], 
+         4: ['journals.pic_1.next', 'businesscards.card_1.next', 'block'], 
+         5: ['janitor', 'journals.pic_2.next'], 
+         6: ['businesscards', 'journals.pic_0.next','tobasement', 'logbook.page.bingo', 'tohallway'],  
+         7: ['journals.pic_1.next','reader.paper2.bingo','businesscards.card_bingo.next', 
+             'logbook.page.bingo', 'tunic.kohlcenter'],  
+         8: ['reader.paper2.bingo'],  
+         9: ['journals.pic_1.next','businesscards.card_bingo.bingo', 'reader'],  
+         10:['tunic.kohlcenter','magnify','block','journals.pic_1.next', 'journals'], 
+         11:['tostacks','block_magnify','block','businesscards.card_bingo.next'], 
+         12:['businesscards.card_1.next','tofrontdesk'],  
+         13:['tocloset_dirty','reader.paper1.next'], 
+         14:['tracks'], 
+         15:['groupconvo_flag'], 
+         16:['savedteddy'], 
+         17:['journals_flag.pic_0.next'], 
+         18:['chap4_finale_c'], 
+        }
+    for fqid in fqids[q]:
+        train_q['t_fqid_' + fqid] = train[train['fqid'] == fqid].groupby(['session_id'])['delt_time'].sum()
+
+    text_fqids = {
+        1:[],
+        2:['tunic.historicalsociety.collection.gramps.found'],
+        3:[],
+        4: ['tunic.humanecology.frontdesk.worker.intro',
+            'tunic.library.frontdesk.worker.wells', 
+            'tunic.library.frontdesk.worker.hello'], 
+        5: ['tunic.humanecology.frontdesk.worker.intro',
+            'tunic.historicalsociety.closet_dirty.gramps.helpclean',
+            'tunic.historicalsociety.closet_dirty.gramps.news'],     
+        6: ['tunic.humanecology.frontdesk.worker.intro',
+            'tunic.historicalsociety.frontdesk.archivist.foundtheodora',
+            'tunic.historicalsociety.closet_dirty.trigger_coffee', 
+            'tunic.historicalsociety.closet_dirty.gramps.archivist'], 
+        7: ['tunic.historicalsociety.closet_dirty.door_block_talk',
+            'tunic.drycleaner.frontdesk.worker.hub',
+            'tunic.historicalsociety.closet_dirty.trigger_coffee'], 
+        8: ['tunic.humanecology.frontdesk.worker.intro',
+            'tunic.historicalsociety.frontdesk.magnify', 
+            'tunic.historicalsociety.closet_dirty.trigger_coffee'], 
+        9: ['tunic.historicalsociety.frontdesk.archivist.hello',
+            'tunic.library.frontdesk.worker.wells', 
+            'tunic.historicalsociety.frontdesk.archivist.foundtheodora'], 
+        10: ['tunic.library.frontdesk.worker.wells',
+            'tunic.historicalsociety.frontdesk.archivist.have_glass_recap',
+             'tunic.historicalsociety.closet_dirty.gramps.news'], 
+        11: ['tunic.historicalsociety.frontdesk.archivist.newspaper_recap',
+             'tunic.historicalsociety.closet_dirty.gramps.archivist'], 
+        12:[],
+        13:['tunic.drycleaner.frontdesk.logbook.page.bingo'],
+        14: ['tunic.flaghouse.entry.flag_girl.symbol_recap', 
+             'tunic.historicalsociety.frontdesk.archivist_glasses.confrontation_recap'],
+        15:['tunic.flaghouse.entry.colorbook'], 
+        16:['tunic.library.frontdesk.worker.nelson'], 
+        17:['tunic.historicalsociety.entry.wells.flag'], 
+        18:['tunic.flaghouse.entry.flag_girl.symbol_recap'], 
+    }
+    for text_fqid in text_fqids[q]:
+        maska = train['text_fqid'] == text_fqid
+        train_q['t_text_fqid_' + text_fqid] = train[maska].groupby(['session_id'])['delt_time'].sum()       
+        train_q['l_text_fqid_' + text_fqid] = train[train['text_fqid'] == text_fqid].groupby(['session_id'])['index'].count()
+
+
+    room_lvls = {
+         1: [['tunic.capitol_0.hall',4],['tunic.historicalsociety.collection',3],
+            ['tunic.historicalsociety.entry',1],['tunic.historicalsociety.collection', 2]], 
+         2: [],
+         3: [['tunic.capitol_0.hall',4]], 
+         4: [['tunic.historicalsociety.frontdesk',12], 
+             ['tunic.historicalsociety.stacks',7]], 
+         5: [['tunic.historicalsociety.stacks',12]],  
+         6: [['tunic.drycleaner.frontdesk',8],  
+             ['tunic.library.microfiche',9]], 
+         7: [['tunic.library.frontdesk',10]], 
+         8: [['tunic.kohlcenter.halloffame', 11], 
+             ['tunic.kohlcenter.halloffame',6]], 
+         9: [['tunic.capitol_1.hall', 12], 
+             ['tunic.historicalsociety.collection',12]],
+         10:[['tunic.humanecology.frontdesk',7]], 
+         11:[['tunic.drycleaner.frontdesk',9], 
+             ['tunic.historicalsociety.collection',6]], 
+         12:[['tunic.historicalsociety.stacks',6],
+             ['tunic.historicalsociety.frontdesk', 7],
+             ['tunic.historicalsociety.closet_dirty',11], 
+             ['tunic.historicalsociety.frontdesk', 12]], 
+         13:[['tunic.library.microfiche', 9], 
+             ['tunic.historicalsociety.stacks', 11],
+             ['tunic.library.frontdesk', 10], 
+             ['tunic.historicalsociety.entry', 5]], 
+         14:[['tunic.historicalsociety.closet_dirty',17],
+             ['tunic.historicalsociety.entry',15]], 
+         15:[['tunic.historicalsociety.entry',15],
+             ['tunic.library.frontdesk',20]], 
+         16:[['tunic.library.frontdesk', 20],
+             ['tunic.wildlife.center',19]], 
+         17:[['tunic.wildlife.center', 19],
+             ['tunic.historicalsociety.stacks', 21]], 
+         18:[['tunic.wildlife.center', 22]], 
+        }
+    for rl in room_lvls[q]:
+        nam = rl[0]+str(rl[1])
+        maska = (train['room_fqid'] == rl[0])&(train['level'] == rl[1])
+        train_q['t_' + nam] = train[maska].groupby(['session_id'])['delt_time'].sum()
+        train_q['l_' + nam] = train[maska].groupby(['session_id'])['index'].count()
+
+    return train_q
+
+def load_targets(args):
+    targets = pd.read_csv(args.target)
+    targets["session"] = targets["session_id"].str.split("_",expand = True)[0]
+    targets["session"] = targets["session"].astype(int)
+    targets['q'] = targets.session_id.apply(lambda x: int(x.split('_')[-1][1:]) )
+    return targets
+
+def delt_time_def(df):
+    df.sort_values(by=['session_id', 'elapsed_time'], inplace=True)
+    df['d_time'] = df['elapsed_time'].diff(1)
+    df['d_time'].fillna(0, inplace=True)
+    df['delt_time'] = df['d_time'].clip(0, 103000)  
+    return df
+
+
+def preprocessing(df, grp):
+    start, end = map(int,grp.split('-'))
+    kol_lvl = (df.groupby(['session_id'])['level'].agg('nunique') < end - start + 1)
+    list_session = kol_lvl[kol_lvl].index
+    df = df[~df['session_id'].isin(list_session)]
+    df = delt_time_def(df)
+    train_ = feature_engineer(pl.from_pandas(df), grp, use_extra=False, feature_suffix='')
+    df = time_feature(df)
+    df = new_page(df, grp)
+    train = text_cnt(df, train_)
+    return train
