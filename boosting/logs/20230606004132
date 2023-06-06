@@ -1,0 +1,59 @@
+Using 756 columns
+Fold:1 2 3 4 5 
+Question 1 - Scores after 5 fold: F1: 0.62812 Precision: 0.77822 Recall: 0.92803
+Fold:1 2 3 4 5 
+Question 2 - Scores after 5 fold: F1: 0.49889 Precision: 0.97886 Recall: 0.99991
+Fold:1 2 3 4 5 
+Question 3 - Scores after 5 fold: F1: 0.48866 Precision: 0.93252 Recall: 0.99927
+Using 1117 columns
+Fold:1 2 3 4 5 
+Question 4 - Scores after 5 fold: F1: 0.62121 Precision: 0.83508 Recall: 0.96094
+Fold:1 2 3 4 5 
+Question 5 - Scores after 5 fold: F1: 0.63589 Precision: 0.65449 Recall: 0.74960
+Fold:1 2 3 4 5 
+Question 6 - Scores after 5 fold: F1: 0.58394 Precision: 0.80170 Recall: 0.96184
+Fold:1 2 3 4 5 
+Question 7 - Scores after 5 fold: F1: 0.55920 Precision: 0.75741 Recall: 0.94018
+Fold:1 2 3 4 5 
+Question 8 - Scores after 5 fold: F1: 0.51652 Precision: 0.63938 Recall: 0.89444
+Fold:1 2 3 4 5 
+Question 9 - Scores after 5 fold: F1: 0.57421 Precision: 0.76770 Recall: 0.95255
+Fold:1 2 3 4 5 
+Question 10 - Scores after 5 fold: F1: 0.63063 Precision: 0.62177 Recall: 0.67187
+Fold:1 2 3 4 5 
+Question 11 - Scores after 5 fold: F1: 0.56526 Precision: 0.68528 Recall: 0.89192
+Fold:1 2 3 4 5 
+Question 12 - Scores after 5 fold: F1: 0.48354 Precision: 0.85982 Recall: 0.99604
+Fold:1 2 3 4 5 
+Question 13 - Scores after 5 fold: F1: 0.55594 Precision: 0.57872 Recall: 0.17463
+Using 1375 columns
+Fold:1 2 3 4 5 
+Question 14 - Scores after 5 fold: F1: 0.58667 Precision: 0.75219 Recall: 0.93964
+Fold:1 2 3 4 5 
+Question 15 - Scores after 5 fold: F1: 0.64459 Precision: 0.62652 Recall: 0.66151
+Fold:1 2 3 4 5 
+Question 16 - Scores after 5 fold: F1: 0.43791 Precision: 0.73946 Recall: 0.99354
+Fold:1 2 3 4 5 
+Question 17 - Scores after 5 fold: F1: 0.44467 Precision: 0.68870 Recall: 0.97138
+Fold:1 2 3 4 5 
+Question 18 - Scores after 5 fold: F1: 0.48914 Precision: 0.95116 Recall: 0.99963
+When using optimal threshold = 0.61...
+Q0: F1 = 0.66364
+Q1: F1 = 0.53695
+Q2: F1 = 0.49937
+Q3: F1 = 0.66738
+Q4: F1 = 0.63174
+Q5: F1 = 0.62840
+Q6: F1 = 0.59664
+Q7: F1 = 0.56393
+Q8: F1 = 0.60968
+Q9: F1 = 0.59187
+Q10: F1 = 0.60807
+Q11: F1 = 0.50073
+Q12: F1 = 0.47231
+Q13: F1 = 0.62598
+Q14: F1 = 0.59184
+Q15: F1 = 0.45741
+Q16: F1 = 0.53317
+Q17: F1 = 0.50396
+==> Overall F1 = 0.68905

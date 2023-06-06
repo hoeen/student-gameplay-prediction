@@ -13,7 +13,7 @@ def parse_args():
     parser.add_argument("--target", default=DIR + "data/raw/input/train_labels.csv", type=str, help="target csv")
     parser.add_argument("--train", default=DIR + "data/raw/input/train.parquet", type=str, help="train parquet")
     parser.add_argument("--model_path", default=DIR + "boosting/models/", type=str, help="model path")
-
+    parser.add_argument("--cv", default=1, type=int, help="using cross-validation")
 
     args = parser.parse_args()
 

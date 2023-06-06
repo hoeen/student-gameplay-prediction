@@ -25,14 +25,19 @@ def main(args):
         df_grp = df[df['level_group'] == grp]
         train = preprocessing(df_grp, grp)
         quests = list_q[grp]
-        create_model(train, df_grp, quests, targets, models, results)
+        create_model(train, df_grp, quests, targets, models, results, args.cv)
 
     score_threshold(results)
 
     time = datetime.now().strftime("%Y%m%d%H%M%S")
     os.makedirs(args.model_path + time)
-    for k, q in models.keys():
-        models[(k,q)].save_model(args.model_path + time + '/' + f'catboost_{time}_quest{q}_fold{k}.cbm')
+    if args.cv:
+        for k, q in models.keys():
+            models[(k,q)].save_model(args.model_path + time + '/' + f'catboost_{time}_quest{q}_fold{k}.cbm')
+    else:
+        for q in models.keys():
+            models[q].save_model(args.model_path + time + '/' + f'catboost_{time}_quest{q}_holdout.cbm')
+        
     return
 
 
