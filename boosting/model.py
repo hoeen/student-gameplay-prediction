@@ -95,5 +95,6 @@ def create_model(train, old_train, quests, targets, models: dict, results: list,
             precision = precision_score(y_val, y_pred > 0.5)
             recall = recall_score(y_val, y_pred > 0.5)
             print(f'Question {q} - Scores F1: {f1:.5f} Precision: {precision:.5f} Recall: {recall:.5f}')
-
+            results[q - 1][0].append(y_val)
+            results[q - 1][1].append(y_pred)
     return
