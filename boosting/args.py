@@ -14,7 +14,8 @@ def parse_args():
     parser.add_argument("--train", default=DIR + "data/raw/input/train.parquet", type=str, help="train parquet")
     parser.add_argument("--model_path", default=DIR + "boosting/models/", type=str, help="model path")
     parser.add_argument("--cv", default=1, type=int, help="using cross-validation")
-
+    parser.add_argument("--nullcol", default=DIR + "boosting/processed/null_feat.npy", type=str, help="null cols")
+    parser.add_argument("--processed", default=DIR + "boosting/processed/", type=str, help="processed path")
     args = parser.parse_args()
 
     return args

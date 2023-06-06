@@ -6,6 +6,105 @@ pd.reset_option('all')
 
 import polars as pl
 import numpy as np
+from catboost import CatBoostClassifier
+from sklearn.model_selection import GroupKFold, train_test_split
+from sklearn.metrics import f1_score, precision_score, recall_score
+
+import numpy as np
+
+# def create_model(train, old_train, quests, targets, models: dict, results: list, is_cv):
+#     kol_quest = len(quests)
+#     cate_cols = train.dtypes[train.dtypes == 'object'].index.tolist()
+#     # ALL_USERS = train.index.unique()
+#     # print('We will train with', len(ALL_USERS) ,'users info')
+#     if is_cv:
+#         print('using CV...')
+#     else:
+#         print('using hold-out...')
+
+#     print(f'Using {len(train.columns)} columns')
+#     # ITERATE THRU QUESTIONS
+#     for q in quests:   
+#         print('Question', q)     
+#         train_q = feature_quest(train, old_train, q)
+        
+#         # TRAIN DATA
+#         train_x = train_q
+#         train_users = train_x.index.values
+#         train_y = targets.loc[targets.q==q].set_index('session').loc[train_users]
+
+#         # TRAIN MODEL - CV
+#         if is_cv:
+#             gkf = GroupKFold(n_splits=5)
+#             f1_list, precision_list, recall_list = [], [], []
+#             print('Fold:', end= '')
+#             for k, (train_idx, val_idx) in enumerate(gkf.split(train_x, groups = train_users)):
+#                 print(k+1, end=' ')
+                
+#                 X_train = train_x.iloc[train_idx]
+#                 X_val = train_x.iloc[val_idx]
+
+#                 y_train = train_y.iloc[train_idx]['correct']
+#                 y_val = train_y.iloc[val_idx]['correct'].values
+
+#                 model = CatBoostClassifier(
+#                     # n_estimators = 300,
+#                     # learning_rate= 0.045,
+#                     # depth = 6,
+#                     devices='GPU',
+#                     # n_estimators=1, depth=1
+#                 )
+                
+#                 model.fit(X_train, y_train, verbose=False, 
+#                         cat_features = cate_cols)
+                
+#                 # SAVE MODEL
+#                 models[(k, q)] = model #fold, q
+
+#                 y_pred = model.predict_proba(X_val)[:,1]
+                
+#                 # scores
+#                 f1 = f1_score(y_val, y_pred > 0.5, average='macro')
+#                 precision = precision_score(y_val, y_pred > 0.5)
+#                 recall = recall_score(y_val, y_pred > 0.5)
+#                 f1_list.append(f1); precision_list.append(precision); recall_list.append(recall)
+#             print()
+#             print(f'Question {q} - Scores after {k+1} fold: F1: {np.mean(f1_list):.5f} Precision: {np.mean(precision_list):.5f} Recall: {np.mean(recall_list):.5f}')
+#             results[q - 1][0].append(y_val)
+#             results[q - 1][1].append(y_pred)
+
+#         else: # hold-out 
+#             user_train, user_val = train_test_split(train_x.index.values, random_state=42)
+#             X_train = train_x.loc[user_train]
+#             X_val = train_x.loc[user_val]
+
+#             y_train = train_y.loc[user_train]['correct']
+#             y_val = train_y.loc[user_val]['correct'].values
+
+#             model = CatBoostClassifier(
+#                 # n_estimators = 300,
+#                 # learning_rate= 0.045,
+#                 # depth = 6,
+#                 devices='GPU',
+#                 # n_estimators=1, depth=1
+#             )
+            
+#             model.fit(X_train, y_train, verbose=False, 
+#                     cat_features = cate_cols)
+            
+#             # SAVE MODEL
+#             models[q] = model #fold, q
+
+#             y_pred = model.predict_proba(X_val)[:,1]
+            
+#             # scores
+#             f1 = f1_score(y_val, y_pred > 0.5, average='macro')
+#             precision = precision_score(y_val, y_pred > 0.5)
+#             recall = recall_score(y_val, y_pred > 0.5)
+#             print(f'Question {q} - Scores F1: {f1:.5f} Precision: {precision:.5f} Recall: {recall:.5f}')
+#             results[q - 1][0].append(y_val)
+#             results[q - 1][1].append(y_pred)
+#     return
 
 # First model (Catboost)
 CATS = ['event_name', 'name', 'fqid', 'room_fqid', 'text_fqid']
@@ -611,6 +710,7 @@ def feature_engineer(x, grp, use_extra, feature_suffix):
     return df.to_pandas()
 
 def time_feature(train):
+    train = train.reset_index()
     q = (
         pl.from_pandas(train)
           .lazy()
@@ -644,10 +744,10 @@ def time_feature(train):
     #     pl.col('session_id').apply(lambda x: int(str(x)[12:])).alias('id_anonymous'),
     # ]
 
-    return q.collect().to_pandas()
+    return q.collect().to_pandas().set_index('session_id')
 
 
-def new_page(X, grp): 
+def new_page(X, grp):   # 여기서 더 일반적인 feature를 추출할 수 있을듯. page 0 을 들른 유저들은 new_page 0, 아닌 유저들은 1로 했는데, 그냥 조회한 page 수를 feature로 넘겨주면 되지않을까?
     '''
     X= revised_train dataset
     '''
@@ -708,13 +808,13 @@ def text_cnt(x, revised_train):
     text_feature=pd.concat([session_recap,reading], axis=1)
     text_feature.columns=['recap_reading', 'reading_cnt']
     
-    revised_train = pd.merge(x, revised_train, on='session_id', how='left')
-
+    # revised_train = pd.merge(x, revised_train, on='session_id', how='left')
+    
     return pd.merge(revised_train, text_feature, on='session_id', how='left').set_index('session_id')
 
 
-def feature_quest(train, q):
-    train_q = train.copy()
+def feature_quest(new_train, train, q):
+    train_q = new_train.copy()
     texts = {
         1: ["Yes! This cool old slip from 1916.", 
              "Go ahead, take a peek at the shirt!", 
@@ -910,7 +1010,13 @@ def preprocessing(df, grp):
     df = df[~df['session_id'].isin(list_session)]
     df = delt_time_def(df)
     train_ = feature_engineer(pl.from_pandas(df), grp, use_extra=False, feature_suffix='')
-    df = time_feature(df)
-    df = new_page(df, grp)
+    # recap text count \w join
     train = text_cnt(df, train_)
-    return train
+    # add year, month, day etc.
+    train = time_feature(train)
+    
+    # df = new_page(df, grp)
+    
+    
+    
+    return train, df
