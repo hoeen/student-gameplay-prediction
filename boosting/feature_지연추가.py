@@ -61,7 +61,41 @@ def add_text(data, revised_data, col, word_list, col_name_mean, col_name_std, co
     return pd.merge(revised_data,total, left_index=True, right_index=True, how='left')
 
   
-  
+   def playtime(data):
+    tmp_df = []
+    #NEW
+
+    qvant = data.groupby(["session_id", "level_group"])['elapsed_time_diff'].quantile(q=0.3)
+    qvant.name = 'qvant1_0_3'
+    tmp_df.append(qvant)
+
+    qvant = data.groupby(["session_id", "level_group"])['elapsed_time_diff'].quantile(q=0.8)
+    qvant.name = 'qvant2_0_8'
+    tmp_df.append(qvant)
+
+    qvant = data.groupby(["session_id", "level_group"])['elapsed_time_diff'].quantile(q=0.5)
+    qvant.name = 'qvant3_0_5'
+    tmp_df.append(qvant)
+
+    qvant = data.groupby(["session_id", "level_group"])['elapsed_time_diff'].quantile(q=0.65)
+    qvant.name = 'qvant4_0_65'
+    tmp_df.append(qvant)
+    
+    #data.drop(EVENT, axis = 1, inplace =True) # 將上面做的獨立出來的Event欄位刪除
+        
+    # "elapsed_time" 單獨計算每個level_group所花的時間   
+    tmp = data.groupby(["session_id", "level_group"])["elapsed_time"].apply(lambda x: x.max() - x.min())
+    tmp.name = "playtime" #此關卡所用的時間
+    tmp_df.append(tmp)
+        
+    df = pd.concat(tmp_df, axis = 1)
+    df = df.fillna(-1) ##?????????????????????
+    df = df.reset_index() #將sesion_id、level_group 從index拉回df column
+    df = df.set_index("session_id")
+    df.drop('level_group', axis=1,inplace=True)
+    return df
+
+
   
   
   
