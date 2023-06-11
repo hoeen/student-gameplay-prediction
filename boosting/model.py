@@ -61,7 +61,7 @@ def create_model(args, train, old_train, quests, targets, models: dict, results:
                     # n_estimators = 300,
                     # learning_rate= 0.045,
                     # depth = 6,
-                    devices='GPU',
+                    task_type='GPU',
                     # n_estimators=1, depth=1
                 )
                 

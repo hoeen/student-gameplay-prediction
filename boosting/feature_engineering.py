@@ -535,6 +535,10 @@ def feature_engineer(x, grp, use_extra, feature_suffix):
           DIALOGS],
         *[pl.col("elapsed_time_diff").filter((pl.col('text').str.contains(c))).median().alias(f'word_median_{c}') for c
           in DIALOGS],
+        *[pl.col("elapsed_time_diff").filter((pl.col('text').str.contains(c))).skew().alias(f'word_skew_{c}') for c
+          in DIALOGS],
+        *[pl.col("elapsed_time_diff").filter((pl.col('text').str.contains(c))).kurtosis().alias(f'word_kurtosis_{c}') for c
+          in DIALOGS],
 
         *[pl.col(c).drop_nulls().n_unique().alias(f"{c}_unique_{feature_suffix}") for c in CATS],
 
@@ -543,6 +547,8 @@ def feature_engineer(x, grp, use_extra, feature_suffix):
         *[pl.col(c).min().alias(f"{c}_min_{feature_suffix}") for c in NUMS],
         *[pl.col(c).max().alias(f"{c}_max_{feature_suffix}") for c in NUMS],
         *[pl.col(c).median().alias(f"{c}_median_{feature_suffix}") for c in NUMS],
+        *[pl.col(c).skew().alias(f"{c}_skew_{feature_suffix}") for c in NUMS],
+        *[pl.col(c).kurtosis().alias(f"{c}_kurtosis_{feature_suffix}") for c in NUMS],
 
         *[pl.col("fqid").filter(pl.col("fqid") == c).count().alias(f"{c}_fqid_counts{feature_suffix}")
           for c in fqid_lists],
