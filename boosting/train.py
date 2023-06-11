@@ -30,8 +30,8 @@ def main(args):
     df = pd.read_parquet(args.train)
     
     # remove outlier users
-    outliers = np.load(args.processed + 'outlier_users.npy')
-    df = df.set_index('session_id').drop(outliers).reset_index()
+    # outliers = np.load(args.processed + 'outlier_users.npy')
+    # df = df.set_index('session_id').drop(outliers).reset_index()
 
     models = {}
     results = [[[], []] for _ in range(18)]

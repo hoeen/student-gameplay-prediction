@@ -16,20 +16,22 @@ def create_model(args, train, old_train, quests, targets, models: dict, results:
     else:
         print('using hold-out...')
 
-    with open(args.nullcol, 'rb') as f:
-        null_feat = pickle.load(f)
+    ### high null columns - experimental ###
+    # with open(args.nullcol, 'rb') as f:
+    #     null_feat = pickle.load(f)
 
-    if quests[0] == 1:
-        nkey = '0-4'
-    elif quests[0] == 4:
-        nkey = '5-12'
-    elif quests[0] == 14:
-        nkey = '13-22'
+    # if quests[0] == 1:
+    #     nkey = '0-4'
+    # elif quests[0] == 4:
+    #     nkey = '5-12'
+    # elif quests[0] == 14:
+    #     nkey = '13-22'
     
-    null_cols = null_feat[nkey]
+    
+    # null_cols = null_feat[nkey]
 
-    train = train.loc[:, [col for col in train.columns if col not in null_cols]]
-    old_train = old_train.loc[:, [col for col in old_train.columns if col not in null_cols]]
+    # train = train.loc[:, [col for col in train.columns if col not in null_cols]]
+    # old_train = old_train.loc[:, [col for col in old_train.columns if col not in null_cols]]
 
     print(f'Using {len(train.columns)} columns')
     

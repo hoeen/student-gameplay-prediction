@@ -622,8 +622,6 @@ def feature_engineer(x, grp, use_extra, feature_suffix):
           c in room_lists],
         *[pl.col("elapsed_time_diff").filter(pl.col("room_fqid") == c).min().alias(f"{c}_ET_min_{feature_suffix}") for
           c in room_lists],
-        *[pl.col("elapsed_time_diff").filter(pl.col("room_fqid") == c).max().alias(f"{c}_ET_max_{feature_suffix}") for
-          c in room_lists],
         *[pl.col("elapsed_time_diff").filter(pl.col("room_fqid") == c).skew().alias(f"{c}_ET_skew_{feature_suffix}") for
           c in room_lists],
         *[pl.col("elapsed_time_diff").filter(pl.col("room_fqid") == c).kurtosis().alias(f"{c}_ET_kurtosis_{feature_suffix}") for
@@ -648,8 +646,6 @@ def feature_engineer(x, grp, use_extra, feature_suffix):
         *[pl.col("elapsed_time_diff").filter(pl.col("event_name") == c).max().alias(f"{c}_ET_max_{feature_suffix}") for
           c in event_name_feature],
         *[pl.col("elapsed_time_diff").filter(pl.col("event_name") == c).min().alias(f"{c}_ET_min_{feature_suffix}") for
-          c in event_name_feature],
-        *[pl.col("elapsed_time_diff").filter(pl.col("event_name") == c).max().alias(f"{c}_ET_max_{feature_suffix}") for
           c in event_name_feature],
         *[pl.col("elapsed_time_diff").filter(pl.col("event_name") == c).skew().alias(f"{c}_ET_skew_{feature_suffix}") for
           c in event_name_feature],
