@@ -54,10 +54,11 @@ def main(args):
         wandb.init(project="gameplay", config=vars(args))
     model = trainer.get_model(args).to(args.device)
     
-
+    
     if not args.submission:
         trainer.run(args, train_data, valid_data, train_target, valid_target, model)
         # test로 검증
+        ## TODO : maximize F1 score by finding best threshold - implementation needed
         trainer.inference(test_data, test_target, model, args)
     else: # model for submission
         trainer.run(args, train_data, test_data, train_target, test_target, model)
