@@ -1,0 +1,62 @@
+using hold-out...
+Using 734 columns
+Question 1
+Question 1 - Scores F1: 0.62221 Precision: 0.78423 Recall: 0.91854
+Question 2
+Question 2 - Scores F1: 0.49451 Precision: 0.97860 Recall: 0.99965
+Question 3
+Question 3 - Scores F1: 0.49846 Precision: 0.93557 Recall: 0.99946
+using hold-out...
+Using 1094 columns
+Question 4
+Question 4 - Scores F1: 0.63275 Precision: 0.83818 Recall: 0.96070
+Question 5
+Question 5 - Scores F1: 0.63878 Precision: 0.65094 Recall: 0.75800
+Question 6
+Question 6 - Scores F1: 0.59064 Precision: 0.80915 Recall: 0.95595
+Question 7
+Question 7 - Scores F1: 0.56071 Precision: 0.76713 Recall: 0.94242
+Question 8
+Question 8 - Scores F1: 0.50104 Precision: 0.62988 Recall: 0.89324
+Question 9
+Question 9 - Scores F1: 0.56957 Precision: 0.75989 Recall: 0.95407
+Question 10
+Question 10 - Scores F1: 0.62643 Precision: 0.60729 Recall: 0.68873
+Question 11
+Question 11 - Scores F1: 0.57165 Precision: 0.69461 Recall: 0.88906
+Question 12
+Question 12 - Scores F1: 0.49078 Precision: 0.86879 Recall: 0.99686
+Question 13
+Question 13 - Scores F1: 0.56937 Precision: 0.55095 Recall: 0.20254
+using hold-out...
+Using 1352 columns
+Question 14
+Question 14 - Scores F1: 0.58601 Precision: 0.73786 Recall: 0.93870
+Question 15
+Question 15 - Scores F1: 0.65895 Precision: 0.63970 Recall: 0.67649
+Question 16
+Question 16 - Scores F1: 0.44162 Precision: 0.73997 Recall: 0.99175
+Question 17
+Question 17 - Scores F1: 0.44985 Precision: 0.69456 Recall: 0.96374
+Question 18
+Question 18 - Scores F1: 0.48710 Precision: 0.95004 Recall: 0.99963
+When using optimal threshold = 0.63...
+Q0: F1 = 0.66368
+Q1: F1 = 0.50180
+Q2: F1 = 0.51646
+Q3: F1 = 0.67470
+Q4: F1 = 0.62157
+Q5: F1 = 0.63001
+Q6: F1 = 0.61389
+Q7: F1 = 0.56452
+Q8: F1 = 0.62534
+Q9: F1 = 0.57747
+Q10: F1 = 0.61115
+Q11: F1 = 0.51791
+Q12: F1 = 0.48987
+Q13: F1 = 0.62743
+Q14: F1 = 0.61598
+Q15: F1 = 0.50937
+Q16: F1 = 0.55387
+Q17: F1 = 0.48669
+==> Overall F1 = 0.69328

@@ -4,22 +4,41 @@ from sklearn.model_selection import GroupKFold, train_test_split
 from sklearn.metrics import f1_score, precision_score, recall_score
 
 import numpy as np
+import pickle
 
-def create_model(train, old_train, quests, targets, models: dict, results: list, is_cv):
+def create_model(args, train, old_train, quests, targets, models: dict, results: list):
     kol_quest = len(quests)
     cate_cols = train.dtypes[train.dtypes == 'object'].index.tolist()
     # ALL_USERS = train.index.unique()
     # print('We will train with', len(ALL_USERS) ,'users info')
-    if is_cv:
+    if args.cv:
         print('using CV...')
     else:
         print('using hold-out...')
 
+    ### high null columns - experimental ###
+    # with open(args.nullcol, 'rb') as f:
+    #     null_feat = pickle.load(f)
+
+    # if quests[0] == 1:
+    #     nkey = '0-4'
+    # elif quests[0] == 4:
+    #     nkey = '5-12'
+    # elif quests[0] == 14:
+    #     nkey = '13-22'
+    
+    
+    # null_cols = null_feat[nkey]
+
+    # train = train.loc[:, [col for col in train.columns if col not in null_cols]]
+    # old_train = old_train.loc[:, [col for col in old_train.columns if col not in null_cols]]
+
     print(f'Using {len(train.columns)} columns')
+    
     # ITERATE THRU QUESTIONS
     for q in quests:   
         print('Question', q)     
-        train_q = feature_quest(train, q)
+        train_q = feature_quest(train, old_train, q)
         
         # TRAIN DATA
         train_x = train_q
@@ -27,7 +46,7 @@ def create_model(train, old_train, quests, targets, models: dict, results: list,
         train_y = targets.loc[targets.q==q].set_index('session').loc[train_users]
 
         # TRAIN MODEL - CV
-        if is_cv:
+        if args.cv:
             gkf = GroupKFold(n_splits=5)
             f1_list, precision_list, recall_list = [], [], []
             print('Fold:', end= '')
@@ -44,7 +63,7 @@ def create_model(train, old_train, quests, targets, models: dict, results: list,
                     # n_estimators = 300,
                     # learning_rate= 0.045,
                     # depth = 6,
-                    devices='GPU',
+                    task_type='GPU',
                     # n_estimators=1, depth=1
                 )
                 
@@ -61,10 +80,13 @@ def create_model(train, old_train, quests, targets, models: dict, results: list,
                 precision = precision_score(y_val, y_pred > 0.5)
                 recall = recall_score(y_val, y_pred > 0.5)
                 f1_list.append(f1); precision_list.append(precision); recall_list.append(recall)
+
+                results[q - 1][0].append(y_val)
+                results[q - 1][1].append(y_pred)
+
             print()
             print(f'Question {q} - Scores after {k+1} fold: F1: {np.mean(f1_list):.5f} Precision: {np.mean(precision_list):.5f} Recall: {np.mean(recall_list):.5f}')
-            results[q - 1][0].append(y_val)
-            results[q - 1][1].append(y_pred)
+            
 
         else: # hold-out 
             user_train, user_val = train_test_split(train_x.index.values, random_state=42)
@@ -97,4 +119,9 @@ def create_model(train, old_train, quests, targets, models: dict, results: list,
             print(f'Question {q} - Scores F1: {f1:.5f} Precision: {precision:.5f} Recall: {recall:.5f}')
             results[q - 1][0].append(y_val)
             results[q - 1][1].append(y_pred)
+
+        # break  #### to test
+
     return
+
+
