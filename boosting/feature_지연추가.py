@@ -170,35 +170,70 @@ def fichi_1_2_3_4_python(train_row,revised_train, text_replace_dic, script_versi
 
 
   
-    def preprocessing(df, grp):
+def preprocessing(df, grp, text_replace_dic, script_version_dic):
+
     start, end = map(int,grp.split('-'))
     kol_lvl = (df.groupby(['session_id'])['level'].agg('nunique') < end - start + 1)
     list_session = kol_lvl[kol_lvl].index
     df = df[~df['session_id'].isin(list_session)]
+
     df = delt_time_def(df)
+    
     train_ = feature_engineer(pl.from_pandas(df), grp, use_extra=False, feature_suffix='')
+    
     # recap text count \w join
     train = text_cnt(df, train_)
     train['recap_reading'] = train['recap_reading'].fillna(0)
+    
     # add year, month, day etc.
     train = time_feature(train)
+    
     # new_page
     train = new_page(df, train, grp)
+    
+    #script_version
+    train=fichi_1_2_3_4_python(df, train, text_replace_dic, script_version_dic)
+    
     # Playtime
     pla=playtime(df)
     train = pd.merge(train, pla, left_index=True, right_index=True, how='left')
+
+
+    # def convert_object_to_category(df):
+    #     object_cols = df.select_dtypes(include='object').columns
+    #     df[object_cols] = df[object_cols].copy().astype('category')
+    #     return df
+
+
+    # # 상관관계 행렬 계산
+    # correlation_matrix = train.corr().abs()
+    # threshold = 0.8 # 임계값 설정
+
+    # high_correlation_cols = np.where(correlation_matrix > threshold)
+    # high_correlation_cols = [(correlation_matrix.columns[x], correlation_matrix.columns[y]) for x, y in zip(*high_correlation_cols) if x != y]
+
+    # cols_to_drop = set()
+    # for col1, col2 in high_correlation_cols:
+    #     if col1 not in cols_to_drop and col2 not in cols_to_drop:
+    #         cols_to_drop.add(col2)
+
+    # # 중복 열 제거한 데이터프레임 생성
+    # train = train.drop(cols_to_drop, axis=1)
 
     # add_text
     if grp =='0-4':
         train=add_text(df, train, 'text', group1_text_corr, 'corr_mean', 'corr_std', 'corr_max')
         train=add_text(df, train, 'text', group1_text_wron, 'wron_mean', 'wron_std', 'wron_max' )
+        train = train.loc[:, ~train.columns.duplicated()] #중복열 삭제
         return train, df
 
     elif grp=='5-12':
         train= add_text(df, train, 'text', group2_text_corr, 'corr_mean', 'corr_std', 'corr_max' )
         train= add_text(df, train, 'text', group2_text_wron, 'wron_mean', 'wron_std', 'wron_max' )
+        train = train.loc[:, ~train.columns.duplicated()] #중복열 삭제
         return train, df
 
     else:
         train=add_text(df, train, 'text', group3_text_wron, 'wron_mean', 'wron_std', 'wron_max' ) 
+        train = train.loc[:, ~train.columns.duplicated()] #중복열 삭제
         return train, df
