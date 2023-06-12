@@ -89,15 +89,86 @@ def add_text(data, revised_data, col, word_list, col_name_mean, col_name_std, co
     tmp_df.append(tmp)
         
     df = pd.concat(tmp_df, axis = 1)
-    df = df.fillna(-1) ##?????????????????????
+    #df = df.fillna(-1) ##????????????????????? 제거
     df = df.reset_index() #將sesion_id、level_group 從index拉回df column
     df = df.set_index("session_id")
     df.drop('level_group', axis=1,inplace=True)
     return df
 
 
+#https://www.kaggle.com/code/jinny1004/vadim-kamaev0-699-q18?scriptVersionId=133131589
+def fichi_1_2_3_4_python(train_row,revised_train, text_replace_dic, script_version_dic): 
+    #print("#1 'script_version'")
+    #1 'script_version'
+    train_row_temp = train_row[['session_id', 'index', 'text' , 'level_group'  ]].copy()
+    train_row_temp = train_row_temp.merge(script_version_dic, on='text')
+
+    train_row_temp = train_row_temp[train_row_temp[['script_version']].notnull().all(1)]
+    train_row_temp = train_row_temp.groupby(['session_id','script_version'])['session_id'].count().reset_index(name="cnt")
+
+    train_row_temp['num_row'] = (train_row_temp
+      .sort_values(by=['cnt'],
+                   ascending=False) 
+      .groupby('session_id', sort=False).cumcount().add(1)
+    )
+    train_row_temp = train_row_temp.loc[train_row_temp.num_row == 1] 
+    train_row_temp = train_row_temp[['session_id','script_version']]
+    train_row = train_row.merge(train_row_temp, on='session_id')
+    del train_row_temp
+    gc.collect()
+
+    #print("#2 3 'delta_index_0_4'   'delta_index_5_12'")
+    #2 3 'delta_index_0_4'   'delta_index_5_12'
+    tmp = train_row[['session_id','index','level_group']]
+    f = lambda x: x.diff()
+
+    tmp['delta_index'] = tmp.sort_values(['session_id','index']).groupby(['session_id'])['index'].transform(f)
+    tmp = tmp[tmp['delta_index'] >1]
+
+
+    tmp5_12  = tmp[tmp['level_group'] == '5-12' ].groupby( ['session_id'   ]).agg({'delta_index':'max'}) .copy() 
+    tmp5_12  = tmp5_12.rename(columns={"delta_index": "delta_index_0_4" })
+
+    tmp5_12_1=tmp5_12.copy()
+    tmp5_12_2=tmp5_12.copy()    
+    tmp5_12_1["level_group"]='5-12'
+    tmp5_12_2["level_group"]='13-22'    
+    tmp5_12 = tmp5_12_1.append(tmp5_12_2)      
+    train_row = train_row.merge( tmp5_12, how = 'left', left_on=[ 'session_id', "level_group"] , right_on=[ 'session_id',"level_group"] ).copy()    
+
+    del  tmp5_12, tmp5_12_1, tmp5_12_2 
+    gc.collect()    
+
+    tmp13_22  = tmp[tmp['level_group'] == '13-22' ].groupby( ['session_id'   ]).agg({'delta_index':'max'}) .copy()      
+    tmp13_22 = tmp13_22.rename(columns={"delta_index": "delta_index_5_12" })
+
+
+    tmp13_22["level_group"]='13-22'   
+    train_row = train_row.merge( tmp13_22, how = 'left', left_on=[ 'session_id',"level_group"] , right_on=['session_id', "level_group"] ).copy() 
+
+
+    del tmp, tmp13_22
+    gc.collect()
+
+    #print("# 4 'text_replace'")
+    # 4 'text_replace'
+    train_row = pd.merge(train_row, text_replace_dic, how = 'left', left_on=["text"] , right_on=["text"] ).copy()
+    train_row["text_replace"] = train_row["text_replace"].combine_first( train_row["text"])    
+
+    train_row[[ 'delta_index_0_4', 'delta_index_5_12']] = train_row[[ 'delta_index_0_4', 'delta_index_5_12']].fillna(0)
+    train_row[[ 'script_version']] = train_row[[ 'script_version']].fillna('') 
+    train_row=pd.get_dummies(train_row, columns=['script_version'],dummy_na=False)
+    
+    version=train_row.groupby(['session_id'])['script_version_original', 'script_version_nohumor','script_version_original', 'script_version_dry'].agg('sum')
+    delta=train_row.groupby(['session_id'])['delta_index_0_4','delta_index_5_12'].agg('mean')
+    
+    total= pd.concat([version, delta], axis=1)
+    
+    return pd.merge(revised_train, total, left_index=True, right_index=True, how='left')
   
   
+
+
   
     def preprocessing(df, grp):
     start, end = map(int,grp.split('-'))
