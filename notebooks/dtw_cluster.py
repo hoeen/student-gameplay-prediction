@@ -46,7 +46,7 @@ def label_cluster(data, room, which='room'):
             random_state=42, 
             n_jobs=6
             )
-        tkm.fit(to_time_series_dataset(random.sample(series, 100)).astype('int'))
+        tkm.fit(to_time_series_dataset(random.sample(series, 2000)).astype('int'))
         inertia = tkm.inertia_
         inertia_values.append(inertia)
         best_model.append(tkm)
@@ -58,13 +58,13 @@ def label_cluster(data, room, which='room'):
     plt.xlabel("Number of clusters")
     plt.ylabel("Inertia")
     plt.title("Scree Plot")
-    plt.ylim(min(inertia_values)-1000, int(1e9))
+    plt.ylim(min(inertia_values)-100000, int(1e9))
     plt.show()
     print('inertia_values:', inertia_values)
     best_n_cluster = int(input("Choose best n_cluster: "))
     print('use best model - n_clusters:', best_n_cluster)
 
-    prediction = best_model[best_n_cluster].predict(to_time_series_dataset(random.sample(series, 100)).astype('int'))
+    prediction = best_model[best_n_cluster].predict(to_time_series_dataset(series).astype('int'))
 
     return prediction, best_model[best_n_cluster] 
 
@@ -85,7 +85,7 @@ cx_cy_room = pd.concat([cx_room, cy_room],axis=1).reset_index().set_index('sessi
 cx_cy_screen = pd.concat([cx_screen, cy_screen], axis=1).reset_index().set_index('session_id')
 
 # result dataframe to save
-result = pd.DataFrame(train.session_id.unique()[:100], columns=['session_id'])
+result = pd.DataFrame(train.session_id.unique(), columns=['session_id'])
 
 room_ids = train.room_fqid.unique()
 clf_dict = {}
