@@ -32,7 +32,6 @@ def label_cluster(data, room, which='room'):
     inertia_values = [] 
     best_model = [None, None, None] # n_cluster 지정시 바로 나올수있게 인덱스 맞춤
     # best_clusters = 0
-    min_inertia = float('inf')
 
     # sample 2000 data to fit
     print('n_clusters:', end=' ')
@@ -53,13 +52,15 @@ def label_cluster(data, room, which='room'):
 
     print('...all range covered')
     ## plot to choose manually after visual inspection
-    plt.figure()
-    plt.plot(range(3, n_clusters_max + 1), inertia_values, marker='o')
-    plt.xlabel("Number of clusters")
-    plt.ylabel("Inertia")
-    plt.title("Scree Plot")
-    plt.ylim(min(inertia_values)-100000, int(1e9))
-    plt.show()
+    fig, ax = plt.subplots()
+    ax.plot(range(3, n_clusters_max + 1), inertia_values, marker='o')
+    ax.set_xlabel("Number of clusters")
+    ax.set_ylabel("Inertia")
+    ax.set_title("Scree Plot")
+    ax.set_ylim(min(inertia_values)-100000, int(1e9))
+    pickle.dump(fig, open(BASIC_PATH + f'figures/tochoose_cluster/{room}_{which}.pkl', 'wb'))
+    print(f'{room}_{which}.pkl saved')
+    
     print('inertia_values:', inertia_values)
     best_n_cluster = int(input("Choose best n_cluster: "))
     print('use best model - n_clusters:', best_n_cluster)
@@ -102,7 +103,4 @@ with open(BASIC_PATH + 'models/dtw_clf_dict.pkl', 'wb') as f:
 
 # save labels
 result.to_csv(BASIC_PATH + 'data/processed/dtw_label.csv', index=None)
-
-
-
 
