@@ -152,70 +152,100 @@ class LSTMATTN(nn.Module):
     def __init__(self, args):
         super(LSTMATTN, self).__init__()
         self.args = args
-
+        self.input_dim = self.args.input_dim
         self.hidden_dim = self.args.hidden_dim
+        self.projection_dim = self.args.projection_dim
         self.n_layers = self.args.n_layers
+        self.lstm_hidden_dim = self.args.lstm_hidden_dim
+        self.cate_cols = self.args.cate_cols
+        self.num_cols = self.args.num_cols
+        self.bert_hidden_dim = 8
+        self.inter_size = 8
+        
         self.n_heads = self.args.n_heads
         self.drop_out = self.args.drop_out
 
-        # Embedding
-        # interaction은 현재 correct로 구성되어있다. correct(1, 2) + padding(0)
-        self.embedding_interaction = nn.Embedding(3, self.hidden_dim // 3)
-        self.embedding_test = nn.Embedding(self.args.n_test + 1, self.hidden_dim // 3)
-        self.embedding_question = nn.Embedding(
-            self.args.n_questions + 1, self.hidden_dim // 3
-        )
-        self.embedding_tag = nn.Embedding(self.args.n_tag + 1, self.hidden_dim // 3)
+        # questions 결정
+        qnum = [None, 3, 10, 5]
+        self.questions = qnum[self.args.level_group]
+
+        # embedding
+        for cat_col in self.args.cate_cols:
+            setattr(self,
+                    'embedding_' + cat_col,
+                    nn.Embedding(getattr(self.args, 'input_size_'+cat_col) + 2, self.hidden_dim)       
+            )       # 원래 +1 이었는데 unknown value까지 생각해서 +2로 바꿈
 
         # embedding combination projection
-        self.comb_proj = nn.Linear((self.hidden_dim // 3) * 4, self.hidden_dim)
+        self.cat_proj = nn.Linear(self.hidden_dim * len(self.args.cate_cols), 
+                                   self.projection_dim // 2)
+        
+        
+        if self.args.cate_cols:
+            # layer normalization
+            self.layernorm = nn.LayerNorm(self.projection_dim // 2)
+            self.num_proj = nn.Linear(len(self.args.num_cols), 
+                                  self.projection_dim // 2)
+        else: 
+            # layer normalization
+            self.layernorm = nn.LayerNorm(self.projection_dim)
+            self.num_proj = nn.Linear(len(self.args.num_cols), 
+                                  self.projection_dim)
+        
+        # batch normalization
+        self.batchnorm = nn.BatchNorm1d(self.projection_dim)
 
+        # comb_proj + len(num_cols) into model
         self.lstm = nn.LSTM(
-            self.hidden_dim, self.hidden_dim, self.n_layers, batch_first=True
+            self.projection_dim, self.lstm_hidden_dim, self.n_layers, batch_first=True
         )
 
         self.config = BertConfig(
             3,  # not used
-            hidden_size=self.hidden_dim,
+            hidden_size=self.bert_hidden_dim,
             num_hidden_layers=1,
             num_attention_heads=self.n_heads,
-            intermediate_size=self.hidden_dim,
+            intermediate_size=self.inter_size,
             hidden_dropout_prob=self.drop_out,
             attention_probs_dropout_prob=self.drop_out,
         )
         self.attn = BertEncoder(self.config)
 
         # Fully connected layer
-        self.fc = nn.Linear(self.hidden_dim, 1)
+        self.fc = nn.Linear(self.lstm_hidden_dim * self.args.max_seq_len, self.questions)
 
         self.activation = nn.Sigmoid()
 
     def forward(self, input):
 
-        test, question, tag, _, mask, interaction = input
+        a = len(self.num_cols)
+        num_data = input[:a]  # 왜 a 대신 len(self.num_cols)로 하면 안되는건지?
+        cate_data = input[a:-1] # mask 제외
+        mask = input[-1]
 
-        batch_size = interaction.size(0)
+        batch_size = input[0].size(0)
 
         # Embedding
-        embed_interaction = self.embedding_interaction(interaction)
-        embed_test = self.embedding_test(test)
-        embed_question = self.embedding_question(question)
-        embed_tag = self.embedding_tag(tag)
+        # embed_event_name = self.embedding_event_name(event_name) 형식 
+        
+        # categorical embedding
+        # concat all categorical + numerical
+        num_data = torch.stack(num_data, 2) # list to tensor
+        num_X = self.layernorm(self.num_proj(num_data))
+        # num_X = self.num_proj(num_data)
 
-        embed = torch.cat(
-            [
-                embed_interaction,
-                embed_test,
-                embed_question,
-                embed_tag,
-            ],
-            2,
-        )
-
-        X = self.comb_proj(embed)
-
+        if self.cate_cols:
+            cat_embed = torch.cat(
+                [getattr(self, 'embedding_' + cat_col)(cate_data[i]) for i, cat_col in enumerate(self.cate_cols)],
+                2,
+            )
+            cat_X = self.layernorm(self.cat_proj(cat_embed))
+            # cat_X = self.cat_proj(cat_embed)
+            X = torch.cat([num_X, cat_X], -1)
+        else: X = num_X
+        
         out, _ = self.lstm(X)
-        out = out.contiguous().view(batch_size, -1, self.hidden_dim)
+        
 
         extended_attention_mask = mask.unsqueeze(1).unsqueeze(2)
         extended_attention_mask = extended_attention_mask.to(dtype=torch.float32)
@@ -224,8 +254,10 @@ class LSTMATTN(nn.Module):
 
         encoded_layers = self.attn(out, extended_attention_mask, head_mask=head_mask)
         sequence_output = encoded_layers[-1]
-
-        out = self.fc(sequence_output).view(batch_size, -1)
+        out = sequence_output.contiguous().view(batch_size, -1)
+        out = self.fc(out).view(batch_size, -1)
+        out = self.activation(out)
+        
         return out
 
 

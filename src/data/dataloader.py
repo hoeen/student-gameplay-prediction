@@ -202,7 +202,8 @@ def feature_engineering(args, df, which='data'): # which : data / label
     if which == 'data':
         df['elapsed_time'] = df.groupby('session_id')['elapsed_time'].apply(lambda x: x - x.shift(1))
         df = df.loc[df.level_group == group_level]
-        df['elapsed_time'] = df['elapsed_time'].fillna(0)
+        for col in args.num_cols:
+            df[col] = df[col].fillna(0)
     else:
         qstart, qend = map(int, question_range.split('-'))
         df = df.loc[df.question_idx.isin(range(qstart, qend+1))]
