@@ -29,6 +29,9 @@ def main(args):
     targets = load_targets(args)
     df = pd.read_parquet(args.train)
     
+    # concat additional data
+    df, targets = add_data(df, targets)
+
     # remove outlier users
     # outliers = np.load(args.processed + 'outlier_users.npy')
     # df = df.set_index('session_id').drop(outliers).reset_index()
