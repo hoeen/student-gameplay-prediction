@@ -12,6 +12,7 @@ from sklearn.metrics import f1_score, precision_score, recall_score
 
 import numpy as np
 
+
 # First model (Catboost)
 CATS = ['event_name', 'name', 'fqid', 'room_fqid', 'text_fqid']
 NUMS = ['page', 'room_coor_x', 'room_coor_y', 'screen_coor_x', 'screen_coor_y',
@@ -755,7 +756,7 @@ def new_page(X, grp):   # 여기서 더 일반적인 feature를 추출할 수 �
     return X.groupby(['session_id']).first().reset_index()
 
 # https://www.kaggle.com/code/glipko/recap-texts#Data-Extraction-
-def recap_cnt(x, revised_train):
+def text_cnt(x, revised_train):
     
     x['in_the_same_dialogue'] = x['text_fqid'].shift() # 한칸씩 뒤로
     x['in_the_same_dialogue'] = x['text_fqid'] == x['in_the_same_dialogue']
@@ -979,7 +980,7 @@ def feature_quest(new_train, train, q):
     return train_q
 
 def load_targets(args):
-    targets = pd.read_csv(args.target)
+    targets = pd.read_parquet(args.target)
     targets["session"] = targets["session_id"].str.split("_",expand = True)[0]
     targets["session"] = targets["session"].astype(int)
     targets['q'] = targets.session_id.apply(lambda x: int(x.split('_')[-1][1:]) )
@@ -992,9 +993,6 @@ def delt_time_def(df):
     df['delt_time'] = df['d_time'].clip(0, 103000)  
     return df
 
-def add_data(df, targets):
-    
-    return 
 
 
 def preprocessing(df, grp):
@@ -1002,17 +1000,18 @@ def preprocessing(df, grp):
     kol_lvl = (df.groupby(['session_id'])['level'].agg('nunique') < end - start + 1)
     list_session = kol_lvl[kol_lvl].index
     df = df[~df['session_id'].isin(list_session)]
-
-    # df = delt_time_def(df) # 이미 만든 feature와 겹침 elapsed_time_diff
-
+    df = delt_time_def(df) # elapsed_time_diff feature와 겹치므로 이후 수정하기
     train_ = feature_engineer(pl.from_pandas(df), grp, use_extra=False, feature_suffix='')
     # recap text count \w join
-    train = recap_cnt(df, train_)
+    train = text_cnt(df, train_)
     # add year, month, day etc.
     train = time_feature(train)
+
     
     # df = new_page(df, grp)
     
     
     
     return train, df
+
+
