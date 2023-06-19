@@ -55,14 +55,14 @@ def create_model(args, train, old_train, quests, targets, models: dict, results:
     # ITERATE THRU QUESTIONS
     for q in quests:   
         print('Question', q)     
-        train_q = feature_quest(train, old_train, q)
+        feature_quest(train, old_train, q)
 
         # set n_estimator params
         # from : https://www.kaggle.com/code/pourchot/simple-xgb
         xgb_params['n_estimators'] = estimators_xgb[q-1]
 
         # TRAIN DATA
-        train_x = train_q
+        train_x = train
         train_users = train_x.index.values
         train_y = targets.loc[targets.q==q].set_index('session').loc[train_users]
 

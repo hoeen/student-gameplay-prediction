@@ -10,6 +10,8 @@ import os
 from datetime import datetime
 import wandb
 import time
+import gc
+from tqdm import tqdm
 
 def logging_time(original_fn):
     def wrapper_fn(*args, **kwargs):
@@ -38,7 +40,7 @@ def main(args):
     list_q = {'0-4':[1,2,3], '5-12':[4,5,6,7,8,9,10,11,12,13], '13-22':[14,15,16,17,18]}
     groups = ['0-4', '5-12', '13-22']
 
-    for grp in groups:
+    for grp in tqdm(groups):
         df_grp = df[df['level_group'] == grp]
         train, old_train = preprocessing(df_grp, grp)
         old_train = old_train[old_train['level_group'] == grp]

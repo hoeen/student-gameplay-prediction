@@ -429,6 +429,7 @@ def feature_engineer(x, grp, use_extra, feature_suffix):
     room_lists = sub_room_lists[grp]
     fqid_lists = sub_fqid_lists[grp]
     aggs = [
+
         pl.col("index").count().alias(f"session_number_{feature_suffix}"),
 
         *[pl.col('index').filter(pl.col('text').str.contains(c)).count().alias(f'word_{c}') for c in DIALOGS],
@@ -645,6 +646,17 @@ def feature_engineer(x, grp, use_extra, feature_suffix):
 
     df = x.with_columns(COLUMNS).groupby(['session_id'], maintain_order=True).agg(aggs).sort("session_id")
 
+    # Time features - Year, month, ...
+    df = df.with_columns(
+        pl.col("session_id").apply(lambda x: int(str(x)[:2])).alias('year'),
+        pl.col("session_id").apply(lambda x: int(str(x)[2:4])+1).alias('month'),
+        pl.col("session_id").apply(lambda x: int(str(x)[4:6])).alias('day'),
+        pl.col("session_id").apply(lambda x: int(str(x)[6:8])).alias('hour'),
+        pl.col("session_id").apply(lambda x: int(str(x)[8:10])).alias('minute'),
+        pl.col("session_id").apply(lambda x: int(str(x)[10:12])).alias('second'),
+        pl.col("session_id").apply(lambda x: int(str(x)[12:])).alias('id_anonymous'),
+    )
+
     if use_extra:
         if grp == '5-12':
             aggs = [
@@ -698,7 +710,7 @@ def feature_engineer(x, grp, use_extra, feature_suffix):
             tmp = x.groupby(["session_id"], maintain_order=True).agg(aggs).sort("session_id")
             df = df.join(tmp, on="session_id", how='left')
 
-    return df.to_pandas()
+    return df.to_pandas(), x.with_columns(COLUMNS).to_pandas()
 
 def time_feature(train):
     train = train.reset_index()
@@ -805,7 +817,7 @@ def text_cnt(x, revised_train):
 
 
 def feature_quest(new_train, train, q):
-    train_q = new_train.copy()
+    # train_q = new_train.copy()
     texts = {
         1: ["Yes! This cool old slip from 1916.", 
              "Go ahead, take a peek at the shirt!", 
@@ -866,7 +878,7 @@ def feature_quest(new_train, train, q):
     i = 0
     for text in texts[q]:
         i += 1
-        train_q['text' + str(i)] = train[train['text'] == text].groupby(['session_id'])['delt_time'].sum()
+        new_train['text' + str(i)] = train[train['text'] == text].groupby(['session_id'])['elapsed_time_diff'].sum()
     
     fqids = {
          1: ['directory'], 
@@ -890,7 +902,7 @@ def feature_quest(new_train, train, q):
          18:['chap4_finale_c'], 
         }
     for fqid in fqids[q]:
-        train_q['t_fqid_' + fqid] = train[train['fqid'] == fqid].groupby(['session_id'])['delt_time'].sum()
+        new_train['t_fqid_' + fqid] = train[train['fqid'] == fqid].groupby(['session_id'])['elapsed_time_diff'].sum()
 
     text_fqids = {
         1:[],
@@ -931,8 +943,8 @@ def feature_quest(new_train, train, q):
     }
     for text_fqid in text_fqids[q]:
         maska = train['text_fqid'] == text_fqid
-        train_q['t_text_fqid_' + text_fqid] = train[maska].groupby(['session_id'])['delt_time'].sum()       
-        train_q['l_text_fqid_' + text_fqid] = train[train['text_fqid'] == text_fqid].groupby(['session_id'])['index'].count()
+        new_train['t_text_fqid_' + text_fqid] = train[maska].groupby(['session_id'])['elapsed_time_diff'].sum()       
+        new_train['l_text_fqid_' + text_fqid] = train[train['text_fqid'] == text_fqid].groupby(['session_id'])['index'].count()
 
 
     room_lvls = {
@@ -974,10 +986,9 @@ def feature_quest(new_train, train, q):
     for rl in room_lvls[q]:
         nam = rl[0]+str(rl[1])
         maska = (train['room_fqid'] == rl[0])&(train['level'] == rl[1])
-        train_q['t_' + nam] = train[maska].groupby(['session_id'])['delt_time'].sum()
-        train_q['l_' + nam] = train[maska].groupby(['session_id'])['index'].count()
+        new_train['t_' + nam] = train[maska].groupby(['session_id'])['elapsed_time_diff'].sum()
+        new_train['l_' + nam] = train[maska].groupby(['session_id'])['index'].count()
 
-    return train_q
 
 def load_targets(args):
     targets = pd.read_parquet(args.target)
@@ -986,26 +997,19 @@ def load_targets(args):
     targets['q'] = targets.session_id.apply(lambda x: int(x.split('_')[-1][1:]) )
     return targets
 
-def delt_time_def(df):
-    df.sort_values(by=['session_id', 'elapsed_time'], inplace=True)
-    df['d_time'] = df['elapsed_time'].diff(1)
-    df['d_time'].fillna(0, inplace=True)
-    df['delt_time'] = df['d_time'].clip(0, 103000)  
-    return df
-
-
 
 def preprocessing(df, grp):
-    start, end = map(int,grp.split('-'))
-    kol_lvl = (df.groupby(['session_id'])['level'].agg('nunique') < end - start + 1)
-    list_session = kol_lvl[kol_lvl].index
-    df = df[~df['session_id'].isin(list_session)]
-    df = delt_time_def(df) # elapsed_time_diff feature와 겹치므로 이후 수정하기
-    train_ = feature_engineer(pl.from_pandas(df), grp, use_extra=False, feature_suffix='')
+    # start, end = map(int,grp.split('-'))
+    # kol_lvl = (df.groupby(['session_id'])['level'].agg('nunique') < end - start + 1)
+    # list_session = kol_lvl[kol_lvl].index
+    # df = df[~df['session_id'].isin(list_session)]
+    # df = delt_time_def(df) # elapsed_time_diff feature와 겹치므로 이후 수정하기
+    train_, df = feature_engineer(pl.from_pandas(df), grp, use_extra=False, feature_suffix='')
     # recap text count \w join
     train = text_cnt(df, train_)
-    # add year, month, day etc.
-    train = time_feature(train)
+
+    # add year, month, day etc. - incorporate into feature_engineer
+    # train = time_feature(train)
 
     
     # df = new_page(df, grp)
