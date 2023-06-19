@@ -24,7 +24,6 @@ xgb_params = {
 estimators_xgb = [498, 448, 378, 364, 405, 495, 456, 249, 384, 405, 356, 262, 484, 381, 392, 248 ,248, 345]
 
 def create_model(args, train, old_train, quests, targets, models: dict, results: list):
-    kol_quest = len(quests)
     cate_cols = train.dtypes[train.dtypes == 'object'].index.tolist()
     # ALL_USERS = train.index.unique()
     # print('We will train with', len(ALL_USERS) ,'users info')

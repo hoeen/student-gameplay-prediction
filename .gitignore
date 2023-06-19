@@ -1,6 +1,7 @@
 __pycache__/
 wandb/
 /boosting/models/
+/boosting/processed/
 /models/
 /data/
 catboost_info/
