@@ -22,6 +22,8 @@ def parse_args():
     parser.add_argument("--model_file", default=DIR + "boosting/processed/model.pkl", type=str)
     parser.add_argument("--result_file", default=DIR + "boosting/processed/result.pkl", type=str)
     parser.add_argument("--level_group", default="0-4", type=str)
+    parser.add_argument("--features", default=DIR + "data/features/feature.pkl", type=str, help="feature dict file")
+
     args = parser.parse_args()
 
     return args

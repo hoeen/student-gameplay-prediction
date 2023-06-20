@@ -10,7 +10,8 @@ from catboost import CatBoostClassifier
 from sklearn.model_selection import GroupKFold, train_test_split
 from sklearn.metrics import f1_score, precision_score, recall_score
 
-import numpy as np
+import os
+import pickle
 
 
 # First model (Catboost)
@@ -817,7 +818,7 @@ def text_cnt(x, revised_train):
 
 
 def feature_quest(new_train, train, q):
-    # train_q = new_train.copy()
+    train_q = new_train.copy()
     texts = {
         1: ["Yes! This cool old slip from 1916.", 
              "Go ahead, take a peek at the shirt!", 
@@ -878,7 +879,7 @@ def feature_quest(new_train, train, q):
     i = 0
     for text in texts[q]:
         i += 1
-        new_train['text' + str(i)] = train[train['text'] == text].groupby(['session_id'])['elapsed_time_diff'].sum()
+        train_q['text' + str(i)] = train[train['text'] == text].groupby(['session_id'])['elapsed_time_diff'].sum()
     
     fqids = {
          1: ['directory'], 
@@ -902,7 +903,7 @@ def feature_quest(new_train, train, q):
          18:['chap4_finale_c'], 
         }
     for fqid in fqids[q]:
-        new_train['t_fqid_' + fqid] = train[train['fqid'] == fqid].groupby(['session_id'])['elapsed_time_diff'].sum()
+        train_q['t_fqid_' + fqid] = train[train['fqid'] == fqid].groupby(['session_id'])['elapsed_time_diff'].sum()
 
     text_fqids = {
         1:[],
@@ -943,8 +944,8 @@ def feature_quest(new_train, train, q):
     }
     for text_fqid in text_fqids[q]:
         maska = train['text_fqid'] == text_fqid
-        new_train['t_text_fqid_' + text_fqid] = train[maska].groupby(['session_id'])['elapsed_time_diff'].sum()       
-        new_train['l_text_fqid_' + text_fqid] = train[train['text_fqid'] == text_fqid].groupby(['session_id'])['index'].count()
+        train_q['t_text_fqid_' + text_fqid] = train[maska].groupby(['session_id'])['elapsed_time_diff'].sum()       
+        train_q['l_text_fqid_' + text_fqid] = train[train['text_fqid'] == text_fqid].groupby(['session_id'])['index'].count()
 
 
     room_lvls = {
@@ -986,19 +987,39 @@ def feature_quest(new_train, train, q):
     for rl in room_lvls[q]:
         nam = rl[0]+str(rl[1])
         maska = (train['room_fqid'] == rl[0])&(train['level'] == rl[1])
-        new_train['t_' + nam] = train[maska].groupby(['session_id'])['elapsed_time_diff'].sum()
-        new_train['l_' + nam] = train[maska].groupby(['session_id'])['index'].count()
+        train_q['t_' + nam] = train[maska].groupby(['session_id'])['elapsed_time_diff'].sum()
+        train_q['l_' + nam] = train[maska].groupby(['session_id'])['index'].count()
 
+    return train_q
 
 def load_targets(args):
     targets = pd.read_parquet(args.target)
+    # targets = pd.read_csv(args.target)
     targets["session"] = targets["session_id"].str.split("_",expand = True)[0]
     targets["session"] = targets["session"].astype(int)
     targets['q'] = targets.session_id.apply(lambda x: int(x.split('_')[-1][1:]) )
     return targets
 
+def feat_to_use(args, train, q):
+    # save features for each questions
+    if os.path.exists(args.features):
+        feat_dic = pickle.load(open(args.features, 'rb'))
+    else:
+        feat_dic = {}
+    null = train.isnull().sum().sort_values(ascending=False) / len(train)
+    drop = list(null[null > 0.9].index)
+    for col in [c for c in train.columns if c not in drop]:
+        if train[col].nunique() == 1:
+            drop.append(col)
+    feat = [c for c in train.columns if c not in drop]
+    feat_dic[q] = feat
+    # save feat dic
+    pickle.dump(feat_dic, open(args.features, 'wb'))
 
-def preprocessing(df, grp):
+    return feat
+
+
+def preprocessing(df, grp, args):
     # start, end = map(int,grp.split('-'))
     # kol_lvl = (df.groupby(['session_id'])['level'].agg('nunique') < end - start + 1)
     # list_session = kol_lvl[kol_lvl].index
@@ -1007,7 +1028,7 @@ def preprocessing(df, grp):
     train_, df = feature_engineer(pl.from_pandas(df), grp, use_extra=False, feature_suffix='')
     # recap text count \w join
     train = text_cnt(df, train_)
-
+    
     # add year, month, day etc. - incorporate into feature_engineer
     # train = time_feature(train)
 

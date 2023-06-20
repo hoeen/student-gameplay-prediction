@@ -1,0 +1,84 @@
+nohup: ignoring input
+using CV...
+Using 1332 columns
+Question 1
+Fold:1 2 3 4 5 
+Question 1 - Scores after 5 fold: F1: 0.61795 Precision: 0.75705 Recall: 0.92642
+Question 2
+Fold:1 2 3 4 5 
+Question 2 - Scores after 5 fold: F1: 0.50864 Precision: 0.96505 Recall: 0.99944
+Question 3
+Fold:1 2 3 4 5 
+Question 3 - Scores after 5 fold: F1: 0.50560 Precision: 0.91536 Recall: 0.99885
+WorkingTime[main]: 96.42 sec, 1.61 min
+using CV...
+Using 1992 columns
+Question 4
+Fold:1 2 3 4 5 
+Question 4 - Scores after 5 fold: F1: 0.62545 Precision: 0.83246 Recall: 0.97025
+Question 5
+Fold:1 2 3 4 5 
+Question 5 - Scores after 5 fold: F1: 0.64495 Precision: 0.65895 Recall: 0.76332
+Question 6
+Fold:1 2 3 4 5 
+Question 6 - Scores after 5 fold: F1: 0.56716 Precision: 0.79349 Recall: 0.97413
+Question 7
+Fold:1 2 3 4 5 
+Question 7 - Scores after 5 fold: F1: 0.54065 Precision: 0.75163 Recall: 0.96183
+Question 8
+Fold:1 2 3 4 5 
+Question 8 - Scores after 5 fold: F1: 0.50114 Precision: 0.62710 Recall: 0.92466
+Question 9
+Fold:1 2 3 4 5 
+Question 9 - Scores after 5 fold: F1: 0.56161 Precision: 0.75201 Recall: 0.95946
+Question 10
+Fold:1 2 3 4 5 
+Question 10 - Scores after 5 fold: F1: 0.63471 Precision: 0.62507 Recall: 0.66143
+Question 11
+Fold:1 2 3 4 5 
+Question 11 - Scores after 5 fold: F1: 0.54891 Precision: 0.66854 Recall: 0.91270
+Question 12
+Fold:1 2 3 4 5 
+Question 12 - Scores after 5 fold: F1: 0.49589 Precision: 0.85449 Recall: 0.99625
+Question 13
+Fold:1 2 3 4 5 
+Question 13 - Scores after 5 fold: F1: 0.50944 Precision: 0.63304 Recall: 0.09751
+WorkingTime[main]: 360.79 sec, 6.01 min
+using CV...
+Using 2465 columns
+Question 14
+Fold:1 2 3 4 5 
+Question 14 - Scores after 5 fold: F1: 0.56619 Precision: 0.73720 Recall: 0.94992
+Question 15
+Fold:1 2 3 4 5 
+Question 15 - Scores after 5 fold: F1: 0.65210 Precision: 0.62891 Recall: 0.65908
+Question 16
+Fold:1 2 3 4 5 
+Question 16 - Scores after 5 fold: F1: 0.42411 Precision: 0.72294 Recall: 0.99837
+Question 17
+Fold:1 2 3 4 5 
+Question 17 - Scores after 5 fold: F1: 0.41463 Precision: 0.68411 Recall: 0.99593
+Question 18
+Fold:1 2 3 4 5 
+Question 18 - Scores after 5 fold: F1: 0.48754 Precision: 0.93654 Recall: 0.99966
+When using optimal threshold = 0.63...
+Q0: F1 = 0.67455
+Q1: F1 = 0.54934
+Q2: F1 = 0.54757
+Q3: F1 = 0.67663
+Q4: F1 = 0.61087
+Q5: F1 = 0.63259
+Q6: F1 = 0.63721
+Q7: F1 = 0.55324
+Q8: F1 = 0.63509
+Q9: F1 = 0.53909
+Q10: F1 = 0.60874
+Q11: F1 = 0.54549
+Q12: F1 = 0.43137
+Q13: F1 = 0.63475
+Q14: F1 = 0.55796
+Q15: F1 = 0.50045
+Q16: F1 = 0.54617
+Q17: F1 = 0.51939
+==> Overall F1 = 0.69374
+WorkingTime[main]: 308.37 sec, 5.14 min

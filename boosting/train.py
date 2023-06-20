@@ -19,7 +19,7 @@ def logging_time(original_fn):
         start_time = time.time()
         result = original_fn(*args, **kwargs)
         end_time = time.time()
-        print("WorkingTime[{}]: {} sec".format(original_fn.__name__, end_time-start_time))
+        print("WorkingTime[{}]: {:.2f} sec, {:.2f} min".format(original_fn.__name__, end_time-start_time, (end_time-start_time)/60))
         return result
     return wrapper_fn
 
@@ -52,7 +52,7 @@ def main(args):
     # for grp in tqdm(groups):
     grp = args.level_group
     df_grp = df[df['level_group'] == grp]
-    train, old_train = preprocessing(df_grp, grp)
+    train, old_train = preprocessing(df_grp, grp, args)
     old_train = old_train[old_train['level_group'] == grp]
     quests = list_q[grp]
     create_model(args, train, old_train, quests, targets, models, results)
@@ -62,10 +62,10 @@ def main(args):
     os.makedirs(args.model_path + time + '_lv' + grp)
     if args.cv:
         for k, q in models.keys():
-            models[(k,q)].save_model(args.model_path + time + '/' + f'{args.model}_{time}_quest{q}_fold{k}.cbm')
+            models[(k,q)].save_model(args.model_path + time + '_lv' + grp + '/' + f'{args.model}_{time}_quest{q}_fold{k}.cbm')
     else:
         for q in models.keys():
-            models[q].save_model(args.model_path + time + '/' + f'{args.model}_{time}_quest{q}_holdout.cbm')
+            models[q].save_model(args.model_path + time + + '_lv' + grp + '/' + f'{args.model}_{time}_quest{q}_holdout.cbm')
 
     # save models, results
     pickle.dump(models, open(args.model_file, 'wb'))
