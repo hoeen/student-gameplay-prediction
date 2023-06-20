@@ -1019,7 +1019,7 @@ def feat_to_use(args, train, q):
     return feat
 
 
-def preprocessing(df, grp, args):
+def preprocessing(df, grp):
     # start, end = map(int,grp.split('-'))
     # kol_lvl = (df.groupby(['session_id'])['level'].agg('nunique') < end - start + 1)
     # list_session = kol_lvl[kol_lvl].index

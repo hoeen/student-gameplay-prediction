@@ -52,7 +52,7 @@ def main(args):
     # for grp in tqdm(groups):
     grp = args.level_group
     df_grp = df[df['level_group'] == grp]
-    train, old_train = preprocessing(df_grp, grp, args)
+    train, old_train = preprocessing(df_grp, grp)
     old_train = old_train[old_train['level_group'] == grp]
     quests = list_q[grp]
     create_model(args, train, old_train, quests, targets, models, results)

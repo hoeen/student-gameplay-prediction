@@ -9,15 +9,15 @@ import numpy as np
 import pickle
 
 xgb_params = {
-        # 'booster': 'gbtree',
+        'booster': 'gbtree',
         'tree_method': 'gpu_hist',
-        # 'objective': 'binary:logistic',
-        # 'eval_metric':'logloss',
-        # 'learning_rate': 0.02,
-        # 'alpha': 8,
-        'max_depth': 1, # 4,
-        # 'subsample':0.8,
-        # 'colsample_bytree': 0.5,
+        'objective': 'binary:logistic',
+        'eval_metric':'logloss',
+        'learning_rate': 0.02,
+        'alpha': 8,
+        'max_depth': 4,
+        'subsample':0.8,
+        'colsample_bytree': 0.5,
         'seed': 42
         }
 
@@ -68,7 +68,11 @@ def create_model(args, train, old_train, quests, targets, models: dict, results:
         q_train = feature_quest(train, old_train, q)
 
         # drop high null + all same value cols
-        FEATURES = feat_to_use(args, q_train, q)
+        if args.level_group == '13-22':
+            FEATURES = list(np.load(args.base_dir + 'data/features/g3_feature_posimp.npy', allow_pickle=True))
+        else:
+            FEATURES = feat_to_use(args, q_train, q)
+        
         print(f'Using {len(FEATURES)} columns')
         # set n_estimator params
         # from : https://www.kaggle.com/code/pourchot/simple-xgb
@@ -97,7 +101,9 @@ def create_model(args, train, old_train, quests, targets, models: dict, results:
                     model = XGBClassifier(
                         **xgb_params
                     )
-                    model.fit(X_train, y_train, verbose=False)
+                    model.fit(X_train, y_train, 
+                            #   eval_set=[(X_train, y_train), (X_val, y_val)], 
+                              verbose=False)
 
                 elif args.model == 'catboost':
                     model = CatBoostClassifier(
