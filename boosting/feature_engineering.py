@@ -452,9 +452,18 @@ def feature_engineer(x, grp, use_extra, feature_suffix):
           in DIALOGS],
         *[pl.col("elapsed_time_diff").filter((pl.col('text').str.contains(c))).quantile(0.25).alias(f'word_quant25_{c}') for c
           in DIALOGS],
+        *[pl.col("elapsed_time_diff").filter((pl.col('text').str.contains(c))).quantile(0.3).alias(f'word_quant3_{c}') for c
+          in DIALOGS],
+        *[pl.col("elapsed_time_diff").filter((pl.col('text').str.contains(c))).quantile(0.8).alias(f'word_quant8_{c}') for c
+          in DIALOGS],
+        *[pl.col("elapsed_time_diff").filter((pl.col('text').str.contains(c))).quantile(0.5).alias(f'word_quant5_{c}') for c
+          in DIALOGS],
+        *[pl.col("elapsed_time_diff").filter((pl.col('text').str.contains(c))).quantile(0.65).alias(f'word_quant65_{c}') for c
+          in DIALOGS],
         *[pl.col("elapsed_time_diff").filter((pl.col('text').str.contains(c))).quantile(0.75).alias(f'word_quant75_{c}') for c
           in DIALOGS],
-
+        *[(pl.col("elapsed_time_diff").filter(pl.col("text") == c).max() - pl.col("elapsed_time_diff").filter(
+            pl.col("text") == c).min()).alias(f"{c}_word_max_min_{feature_suffix}") for c in DIALOGS],
 
         *[pl.col(c).drop_nulls().n_unique().alias(f"{c}_unique_{feature_suffix}") for c in CATS],
 
@@ -467,6 +476,13 @@ def feature_engineer(x, grp, use_extra, feature_suffix):
         *[pl.col(c).kurtosis().alias(f"{c}_kurtosis_{feature_suffix}") for c in NUMS],
         *[pl.col(c).quantile(0.25).alias(f"{c}_quant25_{feature_suffix}") for c in NUMS],
         *[pl.col(c).quantile(0.75).alias(f"{c}_quant75_{feature_suffix}") for c in NUMS],
+        *[pl.col(c).quantile(0.3).alias(f"{c}_quant3_{feature_suffix}") for c in NUMS],
+        *[pl.col(c).quantile(0.8).alias(f"{c}_quant8_{feature_suffix}") for c in NUMS],
+        *[pl.col(c).quantile(0.5).alias(f"{c}_quant5_{feature_suffix}") for c in NUMS],
+        *[pl.col(c).quantile(0.65).alias(f"{c}_quant65_{feature_suffix}") for c in NUMS],
+        *[pl.col(c).var().alias(f"{c}_var_{feature_suffix}") for c in NUMS],
+        *[(pl.col(c).max() - pl.col(c).min()).alias(f"{c}_max_min_{feature_suffix}") for c in NUMS],
+ 
 
         *[pl.col("fqid").filter(pl.col("fqid") == c).count().alias(f"{c}_fqid_counts{feature_suffix}")
           for c in fqid_lists],
@@ -488,8 +504,21 @@ def feature_engineer(x, grp, use_extra, feature_suffix):
           c in fqid_lists],
         *[pl.col("elapsed_time_diff").filter(pl.col("fqid") == c).quantile(0.25).alias(f"{c}_ET_quant25_{feature_suffix}") for
           c in fqid_lists],
-        *[pl.col("elapsed_time_diff").filter(pl.col("fqid") == c).quantile(0.75).alias(f"{c}_ET_quant75_{feature_suffix}") for
+        *[pl.col("elapsed_time_diff").filter(pl.col("fqid") == c).quantile(0.75).alias(f"{c}_ET_quant75_{feature_suffix}") for 
           c in fqid_lists],
+        *[pl.col("elapsed_time_diff").filter(pl.col("fqid") == c).quantile(0.3).alias(f"{c}_ET_quant3_{feature_suffix}") for
+          c in fqid_lists],
+        *[pl.col("elapsed_time_diff").filter(pl.col("fqid") == c).quantile(0.8).alias(f"{c}_ET_quant8_{feature_suffix}") for 
+          c in fqid_lists],
+        *[pl.col("elapsed_time_diff").filter(pl.col("fqid") == c).quantile(0.5).alias(f"{c}_ET_quant5_{feature_suffix}") for
+          c in fqid_lists],
+        *[pl.col("elapsed_time_diff").filter(pl.col("fqid") == c).quantile(0.65).alias(f"{c}_ET_quant65_{feature_suffix}") for
+          c in fqid_lists],
+        *[pl.col("elapsed_time_diff").filter(pl.col("fqid") == c).var().alias(f"{c}_ET_var_{feature_suffix}") for
+          c in fqid_lists],
+        *[(pl.col("elapsed_time_diff").filter(pl.col("fqid") == c).max() - pl.col("elapsed_time_diff").filter(
+            pl.col("fqid") == c).min()).alias(f"{c}_ET_max_min_{feature_suffix}") for c in fqid_lists],
+
 
 
         *[pl.col("text_fqid").filter(pl.col("text_fqid") == c).count().alias(f"{c}_text_fqid_counts{feature_suffix}")
@@ -516,6 +545,19 @@ def feature_engineer(x, grp, use_extra, feature_suffix):
           c in text_lists],
         *[pl.col("elapsed_time_diff").filter(pl.col("text_fqid") == c).quantile(0.75).alias(f"{c}_ET_quant75_{feature_suffix}") for
           c in text_lists],
+        *[pl.col("elapsed_time_diff").filter(pl.col("text_fqid") == c).quantile(0.3).alias(f"{c}_ET_quant3_{feature_suffix}") for
+          c in text_lists],
+        *[pl.col("elapsed_time_diff").filter(pl.col("text_fqid") == c).quantile(0.8).alias(f"{c}_ET_quant8_{feature_suffix}") for
+          c in text_lists],
+        *[pl.col("elapsed_time_diff").filter(pl.col("text_fqid") == c).quantile(0.5).alias(f"{c}_ET_quant5_{feature_suffix}") for
+          c in text_lists],
+        *[pl.col("elapsed_time_diff").filter(pl.col("text_fqid") == c).quantile(0.65).alias(f"{c}_ET_quant65_{feature_suffix}") for
+          c in text_lists],
+        *[pl.col("elapsed_time_diff").filter(pl.col("text_fqid") == c).var().alias(f"{c}_ET_var_{feature_suffix}") for
+          c in text_lists],
+        *[(pl.col("elapsed_time_diff").filter(pl.col("text_fqid") == c).max() - pl.col("elapsed_time_diff").filter(
+            pl.col("text_fqid") == c).min()).alias(f"{c}_ET_max_min_{feature_suffix}") for c in text_lists],
+
 
         *[pl.col("room_fqid").filter(pl.col("room_fqid") == c).count().alias(f"{c}_room_fqid_counts{feature_suffix}")
           for c in room_lists],
@@ -539,6 +581,20 @@ def feature_engineer(x, grp, use_extra, feature_suffix):
           c in room_lists],
         *[pl.col("elapsed_time_diff").filter(pl.col("room_fqid") == c).quantile(0.75).alias(f"{c}_ET_quant75_{feature_suffix}") for
           c in room_lists],
+        *[pl.col("elapsed_time_diff").filter(pl.col("room_fqid") == c).quantile(0.3).alias(f"{c}_ET_quant3_{feature_suffix}") for
+          c in room_lists],
+        *[pl.col("elapsed_time_diff").filter(pl.col("room_fqid") == c).quantile(0.8).alias(f"{c}_ET_quant8_{feature_suffix}") for
+          c in room_lists],
+        *[pl.col("elapsed_time_diff").filter(pl.col("room_fqid") == c).quantile(0.5).alias(f"{c}_ET_quant5_{feature_suffix}") for
+          c in room_lists],
+        *[pl.col("elapsed_time_diff").filter(pl.col("room_fqid") == c).quantile(0.65).alias(f"{c}_ET_quant65_{feature_suffix}") for
+          c in room_lists], 
+        *[pl.col("elapsed_time_diff").filter(pl.col("room_fqid") == c).var().alias(f"{c}_ET_var_{feature_suffix}") for
+          c in room_lists],
+        *[(pl.col("elapsed_time_diff").filter(pl.col("room_fqid") == c).max() - pl.col("elapsed_time_diff").filter(
+            pl.col("room_fqid") == c).min()).alias(f"{c}_ET_max_min_{feature_suffix}") for c in room_lists],
+
+        
 
         *[pl.col("event_name").filter(pl.col("event_name") == c).count().alias(f"{c}_event_name_counts{feature_suffix}")
           for c in event_name_feature],
@@ -564,6 +620,19 @@ def feature_engineer(x, grp, use_extra, feature_suffix):
           c in event_name_feature],
         *[pl.col("elapsed_time_diff").filter(pl.col("event_name") == c).quantile(0.75).alias(f"{c}_ET_quant75_{feature_suffix}") for
           c in event_name_feature],
+        *[pl.col("elapsed_time_diff").filter(pl.col("event_name") == c).quantile(0.3).alias(f"{c}_ET_quant3_{feature_suffix}") for
+          c in event_name_feature],
+        *[pl.col("elapsed_time_diff").filter(pl.col("event_name") == c).quantile(0.8).alias(f"{c}_ET_quant8_{feature_suffix}") for
+          c in event_name_feature],
+        *[pl.col("elapsed_time_diff").filter(pl.col("event_name") == c).quantile(0.5).alias(f"{c}_ET_quant5_{feature_suffix}") for
+          c in event_name_feature],
+        *[pl.col("elapsed_time_diff").filter(pl.col("event_name") == c).quantile(0.65).alias(f"{c}_ET_quant65_{feature_suffix}") for
+          c in event_name_feature],
+        *[pl.col("elapsed_time_diff").filter(pl.col("event_name") == c).var().alias(f"{c}_ET_var_{feature_suffix}") for
+          c in event_name_feature],
+        *[(pl.col("elapsed_time_diff").filter(pl.col("event_name") == c).max() - pl.col("elapsed_time_diff").filter(
+            pl.col("event_name") == c).min()).alias(f"{c}_ET_max_min_{feature_suffix}") for c in event_name_feature],
+
 
         *[pl.col("name").filter(pl.col("name") == c).count().alias(f"{c}_name_counts{feature_suffix}") for c in
           name_feature],
@@ -588,6 +657,19 @@ def feature_engineer(x, grp, use_extra, feature_suffix):
           c in name_feature],
         *[pl.col("elapsed_time_diff").filter(pl.col("name") == c).quantile(0.75).alias(f"{c}_ET_quant75_{feature_suffix}") for
           c in name_feature],
+         *[pl.col("elapsed_time_diff").filter(pl.col("name") == c).quantile(0.3).alias(f"{c}_ET_quant3_{feature_suffix}") for
+          c in name_feature],
+        *[pl.col("elapsed_time_diff").filter(pl.col("name") == c).quantile(0.8).alias(f"{c}_ET_quant8_{feature_suffix}") for
+          c in name_feature],
+        *[pl.col("elapsed_time_diff").filter(pl.col("name") == c).quantile(0.5).alias(f"{c}_ET_quant5_{feature_suffix}") for
+          c in name_feature],
+        *[pl.col("elapsed_time_diff").filter(pl.col("name") == c).quantile(0.65).alias(f"{c}_ET_quant65_{feature_suffix}") for
+          c in name_feature], 
+        *[pl.col("elapsed_time_diff").filter(pl.col("name") == c).var().alias(f"{c}_ET_var_{feature_suffix}") for
+          c in name_feature],
+        *[(pl.col("elapsed_time_diff").filter(pl.col("name") == c).max() - pl.col("elapsed_time_diff").filter(
+            pl.col("name") == c).min()).alias(f"{c}_ET_max_min_{feature_suffix}") for c in name_feature],
+
 
         *[pl.col("level").filter(pl.col("level") == c).count().alias(f"{c}_LEVEL_count{feature_suffix}") for c in
           LEVELS],
@@ -613,6 +695,19 @@ def feature_engineer(x, grp, use_extra, feature_suffix):
           c in LEVELS],
         *[pl.col("elapsed_time_diff").filter(pl.col("level") == c).quantile(0.75).alias(f"{c}_ET_quant75_{feature_suffix}") for
           c in LEVELS],
+        *[pl.col("elapsed_time_diff").filter(pl.col("level") == c).quantile(0.3).alias(f"{c}_ET_quant3_{feature_suffix}") for
+          c in LEVELS],
+        *[pl.col("elapsed_time_diff").filter(pl.col("level") == c).quantile(0.8).alias(f"{c}_ET_quant8_{feature_suffix}") for
+          c in LEVELS],
+        *[pl.col("elapsed_time_diff").filter(pl.col("level") == c).quantile(0.5).alias(f"{c}_ET_quant5_{feature_suffix}") for
+          c in LEVELS],
+        *[pl.col("elapsed_time_diff").filter(pl.col("level") == c).quantile(0.65).alias(f"{c}_ET_quant65_{feature_suffix}") for
+          c in LEVELS],
+        *[pl.col("elapsed_time_diff").filter(pl.col("level") == c).var().alias(f"{c}_var_{feature_suffix}") for
+          c in LEVELS],
+        *[(pl.col("elapsed_time_diff").filter(pl.col("level") == c).max() - pl.col("elapsed_time_diff").filter(
+            pl.col("level") == c).min()).alias(f"{c}_ET_max_min_{feature_suffix}") for c in LEVELS],
+
 
         *[pl.col("level_group").filter(pl.col("level_group") == c).count().alias(
             f"{c}_LEVEL_group_count{feature_suffix}") for c in
@@ -640,6 +735,18 @@ def feature_engineer(x, grp, use_extra, feature_suffix):
         *[pl.col("elapsed_time_diff").filter(pl.col("level_group") == c).quantile(0.25).alias(f"{c}_ET_quant25_{feature_suffix}") for
           c in level_groups],
         *[pl.col("elapsed_time_diff").filter(pl.col("level_group") == c).quantile(0.75).alias(f"{c}_ET_quant75_{feature_suffix}") for
+          c in level_groups],
+        *[pl.col("elapsed_time_diff").filter(pl.col("level_group") == c).quantile(0.3).alias(f"{c}_ET_quant3_{feature_suffix}") for
+          c in level_groups],
+        *[pl.col("elapsed_time_diff").filter(pl.col("level_group") == c).quantile(0.8).alias(f"{c}_ET_quant8_{feature_suffix}") for
+          c in level_groups],
+        *[pl.col("elapsed_time_diff").filter(pl.col("level_group") == c).quantile(0.5).alias(f"{c}_ET_quant5_{feature_suffix}") for
+          c in level_groups],
+        *[pl.col("elapsed_time_diff").filter(pl.col("level_group") == c).quantile(0.65).alias(f"{c}_ET_quant65_{feature_suffix}") for
+          c in level_groups],
+        *[(pl.col("elapsed_time_diff").filter(pl.col("level_group") == c).max() - pl.col("elapsed_time_diff").filter(
+            pl.col("level_group") == c).min()).alias(f"{c}_ET_max_min_{feature_suffix}") for c in level_groups],
+        *[pl.col("elapsed_time_diff").filter(pl.col("level_group") == c).var().alias(f"{c}_ET_var_{feature_suffix}") for
           c in level_groups]
 
     ]

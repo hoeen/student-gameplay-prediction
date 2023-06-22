@@ -35,7 +35,9 @@ cat_params = {
 estimators_xgb = [498, 448, 378, 364, 405, 495, 456, 249, 384, 405, 356, 262, 484, 381, 392, 248 ,248, 345]
 
 def create_model(args, train, old_train, quests, targets, models: dict, results: list):
-    cate_cols = train.dtypes[train.dtypes == 'object'].index.tolist()
+    cate_cols = train.dtypes[(train.dtypes == 'object') |\
+                            (train.dtypes == 'uint32') | \
+                            (train.dtypes == 'int64')].index.tolist()
     # ALL_USERS = train.index.unique()
     # print('We will train with', len(ALL_USERS) ,'users info')
     if args.cv:
@@ -61,18 +63,19 @@ def create_model(args, train, old_train, quests, targets, models: dict, results:
     # old_train = old_train.loc[:, [col for col in old_train.columns if col not in null_cols]]
 
     # print(f'Using {len(train.columns)} columns')
-    
+    pos_feat = pickle.load(open(args.base_dir + "data/features/pos_feat_morefeat.pkl", "rb"))
+
     # ITERATE THRU QUESTIONS
     for q in quests:   
         print('Question', q)     
         q_train = feature_quest(train, old_train, q)
 
-        # drop high null + all same value cols
-        if args.level_group == '13-22':
-            FEATURES = list(np.load(args.base_dir + 'data/features/g3_feature_posimp.npy', allow_pickle=True))
-        else:
-            FEATURES = feat_to_use(args, q_train, q)
-        
+        # USE SELECTED FEATURES 
+        # if args.level_group == '13-22':
+        #     FEATURES = list(np.load(args.base_dir + 'data/features/g3_feature_posimp.npy', allow_pickle=True))
+        # else:
+        #     FEATURES = feat_to_use(args, q_train, q)
+        FEATURES = pos_feat[q]
         print(f'Using {len(FEATURES)} columns')
         # set n_estimator params
         # from : https://www.kaggle.com/code/pourchot/simple-xgb

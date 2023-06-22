@@ -12,6 +12,7 @@ import wandb
 import time
 from tqdm import tqdm
 import pickle
+import gc 
 
 DATA_PATH = ''
 def logging_time(original_fn):
