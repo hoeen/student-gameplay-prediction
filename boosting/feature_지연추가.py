@@ -1070,27 +1070,74 @@ def delt_time_def(df):
 
 
 # 수정
-def new_page(X,revised_train, grp): 
+def new_page(X, revised_train, grp):
     '''
-    X= original train dataset
+    X = original train dataset
     '''
     # 이상치 session_id 추출
     if grp == '5-12':
-        session_2=X[X.page==0].session_id.unique().tolist()
-        X.loc[X['session_id'].isin(session_2), 'new_page'] = 0
-        X.loc[~X['session_id'].isin(session_2), 'new_page'] = 1
-        result=X.groupby(['session_id']).first().reset_index()
-        result=result.set_index('session_id')['new_page']
-        return pd.merge(revised_train,result, left_index=True, right_index=True, how='left')
+        session_2 = X.loc[X.page == 0, 'session_id'].unique()
+        X['new_page'] = 1
+        X.loc[X.session_id.isin(session_2), 'new_page'] = 0
+
+        # new_page == 0이라면
+        page_0 = X[X['session_id'].isin(session_2)]
+        kur0 = page_0.groupby('session_id')['elapsed_time_diff'].apply(lambda x: x.kurtosis()).fillna(0)
+        skew0 = page_0.groupby('session_id')['elapsed_time_diff'].apply(lambda x: x.skew()).fillna(0)
+
+        pd_kur0 = pd.DataFrame({'new_page_kur': kur0})
+        pd_sk0 = pd.DataFrame({'new_page_skew': skew0})
+
+        col_total0 = pd.concat([pd_kur0, pd_sk0], axis=1)
+
+        # new_page == 1이라면
+        page_1 = X[~X['session_id'].isin(session_2)]
+        kur = page_1.groupby('session_id')['elapsed_time_diff'].apply(lambda x: x.kurtosis()).fillna(0)
+        skew = page_1.groupby('session_id')['elapsed_time_diff'].apply(lambda x: x.skew()).fillna(0)
+
+        pd_kur = pd.DataFrame({'new_page_kur': kur})
+        pd_sk = pd.DataFrame({'new_page_skew': skew})
+
+        col_total1 = pd.concat([pd_kur, pd_sk], axis=1)
+
+        total = pd.concat([col_total0, col_total1], axis=0)
+
+        del session_2, page_0, kur0, skew0, pd_kur0, pd_sk0, page_1, kur, skew, pd_kur, pd_sk, col_total0, col_total1
+        gc.collect()
+
+        return pd.merge(revised_train, total, left_index=True, right_index=True, how='left')
     
     elif grp == '13-22':
-        session_3=X[(X.page==0)|(X.page==1)|(X.page==2)].session_id.unique().tolist()
-        X.loc[X['session_id'].isin(session_3), 'new_page'] = 0
-        X.loc[~X['session_id'].isin(session_3), 'new_page'] = 1
-        result=X.groupby(['session_id']).first().reset_index()
-        result=result.set_index('session_id')['new_page']
-        return pd.merge(revised_train,result, left_index=True, right_index=True, how='left')
-    
+        session_3 = X.loc[X.page.isin([0, 1, 2]), 'session_id'].unique()
+        X['new_page'] = 1
+        X.loc[X.session_id.isin(session_3), 'new_page'] = 0
+
+        # new_page == 0이라면
+        page_0 = X[X['session_id'].isin(session_3)]
+        kur0 = page_0.groupby('session_id')['elapsed_time_diff'].apply(lambda x: x.kurtosis()).fillna(0)
+        skew0 = page_0.groupby('session_id')['elapsed_time_diff'].apply(lambda x: x.skew()).fillna(0)
+
+        pd_kur0 = pd.DataFrame({'new_page_kur': kur0})
+        pd_sk0 = pd.DataFrame({'new_page_skew': skew0})
+
+        col_total0 = pd.concat([pd_kur0, pd_sk0], axis=1)
+
+        # new_page == 1이라면
+        page_1 = X[~X['session_id'].isin(session_3)]
+        kur = page_1.groupby('session_id')['elapsed_time_diff'].apply(lambda x: x.kurtosis()).fillna(0)
+        skew = page_1.groupby('session_id')['elapsed_time_diff'].apply(lambda x: x.skew()).fillna(0)
+
+        pd_kur = pd.DataFrame({'new_page_kur': kur})
+        pd_sk = pd.DataFrame({'new_page_skew': skew})
+
+        col_total1 = pd.concat([pd_kur, pd_sk], axis=1)
+
+        total = pd.concat([col_total0, col_total1], axis=0)
+
+        del session_3, page_0, kur0, skew0, pd_kur0, pd_sk0, page_1, kur, skew, pd_kur, pd_sk, col_total0, col_total1
+        gc.collect()
+
+        return pd.merge(revised_train, total, left_index=True, right_index=True, how='left')
     else:
         return revised_train
 
@@ -1201,13 +1248,13 @@ def fichi_1_2_3_4_python(train_row,revised_train, text_replace_dic, script_versi
     train_row[[ 'script_version']] = train_row[[ 'script_version']].fillna('') 
     train_row=pd.get_dummies(train_row, columns=['script_version'],dummy_na=False)
     
-    version=train_row.groupby(['session_id'])['script_version_original', 'script_version_nohumor','script_version_original', 'script_version_dry'].agg('sum')
+    version=train_row.groupby(['session_id'])['script_version_original', 'script_version_nohumor','script_version_nosnark', 'script_version_dry'].agg('sum')
     delta=train_row.groupby(['session_id'])['delta_index_0_4','delta_index_5_12'].agg('mean')
     
     total= pd.concat([version, delta], axis=1)
     
     return pd.merge(revised_train, total, left_index=True, right_index=True, how='left')
-
+        
 
 def preprocessing(df, grp, text_replace_dic, script_version_dic):
 
