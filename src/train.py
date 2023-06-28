@@ -18,8 +18,10 @@ def main(args):
     if platform.system() == 'Linux':
         args.device = "cuda" if torch.cuda.is_available() else "cpu"
     elif platform.system() == 'Darwin':
-        args.device = "mps" if torch.cuda.is_available() else "cpu"
+        args.device = "mps" if torch.backends.mps.is_available() else "cpu"
 
+    print('Using Device:', args.device)
+    
     # num_cols, cate_cols
     if args.num_cols:
         args.num_cols = args.num_cols.split(' ')

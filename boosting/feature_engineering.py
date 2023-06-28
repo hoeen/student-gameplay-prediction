@@ -10,101 +10,9 @@ from catboost import CatBoostClassifier
 from sklearn.model_selection import GroupKFold, train_test_split
 from sklearn.metrics import f1_score, precision_score, recall_score
 
-import numpy as np
+import os
+import pickle
 
-# def create_model(train, old_train, quests, targets, models: dict, results: list, is_cv):
-#     kol_quest = len(quests)
-#     cate_cols = train.dtypes[train.dtypes == 'object'].index.tolist()
-#     # ALL_USERS = train.index.unique()
-#     # print('We will train with', len(ALL_USERS) ,'users info')
-#     if is_cv:
-#         print('using CV...')
-#     else:
-#         print('using hold-out...')
-
-#     print(f'Using {len(train.columns)} columns')
-#     # ITERATE THRU QUESTIONS
-#     for q in quests:   
-#         print('Question', q)     
-#         train_q = feature_quest(train, old_train, q)
-        
-#         # TRAIN DATA
-#         train_x = train_q
-#         train_users = train_x.index.values
-#         train_y = targets.loc[targets.q==q].set_index('session').loc[train_users]
-
-#         # TRAIN MODEL - CV
-#         if is_cv:
-#             gkf = GroupKFold(n_splits=5)
-#             f1_list, precision_list, recall_list = [], [], []
-#             print('Fold:', end= '')
-#             for k, (train_idx, val_idx) in enumerate(gkf.split(train_x, groups = train_users)):
-#                 print(k+1, end=' ')
-                
-#                 X_train = train_x.iloc[train_idx]
-#                 X_val = train_x.iloc[val_idx]
-
-#                 y_train = train_y.iloc[train_idx]['correct']
-#                 y_val = train_y.iloc[val_idx]['correct'].values
-
-#                 model = CatBoostClassifier(
-#                     # n_estimators = 300,
-#                     # learning_rate= 0.045,
-#                     # depth = 6,
-#                     devices='GPU',
-#                     # n_estimators=1, depth=1
-#                 )
-                
-#                 model.fit(X_train, y_train, verbose=False, 
-#                         cat_features = cate_cols)
-                
-#                 # SAVE MODEL
-#                 models[(k, q)] = model #fold, q
-
-#                 y_pred = model.predict_proba(X_val)[:,1]
-                
-#                 # scores
-#                 f1 = f1_score(y_val, y_pred > 0.5, average='macro')
-#                 precision = precision_score(y_val, y_pred > 0.5)
-#                 recall = recall_score(y_val, y_pred > 0.5)
-#                 f1_list.append(f1); precision_list.append(precision); recall_list.append(recall)
-#             print()
-#             print(f'Question {q} - Scores after {k+1} fold: F1: {np.mean(f1_list):.5f} Precision: {np.mean(precision_list):.5f} Recall: {np.mean(recall_list):.5f}')
-#             results[q - 1][0].append(y_val)
-#             results[q - 1][1].append(y_pred)
-
-#         else: # hold-out 
-#             user_train, user_val = train_test_split(train_x.index.values, random_state=42)
-#             X_train = train_x.loc[user_train]
-#             X_val = train_x.loc[user_val]
-
-#             y_train = train_y.loc[user_train]['correct']
-#             y_val = train_y.loc[user_val]['correct'].values
-
-#             model = CatBoostClassifier(
-#                 # n_estimators = 300,
-#                 # learning_rate= 0.045,
-#                 # depth = 6,
-#                 devices='GPU',
-#                 # n_estimators=1, depth=1
-#             )
-            
-#             model.fit(X_train, y_train, verbose=False, 
-#                     cat_features = cate_cols)
-            
-#             # SAVE MODEL
-#             models[q] = model #fold, q
-
-#             y_pred = model.predict_proba(X_val)[:,1]
-            
-#             # scores
-#             f1 = f1_score(y_val, y_pred > 0.5, average='macro')
-#             precision = precision_score(y_val, y_pred > 0.5)
-#             recall = recall_score(y_val, y_pred > 0.5)
-#             print(f'Question {q} - Scores F1: {f1:.5f} Precision: {precision:.5f} Recall: {recall:.5f}')
-#             results[q - 1][0].append(y_val)
-#             results[q - 1][1].append(y_pred)
-#     return
 
 # First model (Catboost)
 CATS = ['event_name', 'name', 'fqid', 'room_fqid', 'text_fqid']
@@ -522,6 +430,7 @@ def feature_engineer(x, grp, use_extra, feature_suffix):
     room_lists = sub_room_lists[grp]
     fqid_lists = sub_fqid_lists[grp]
     aggs = [
+
         pl.col("index").count().alias(f"session_number_{feature_suffix}"),
 
         *[pl.col('index').filter(pl.col('text').str.contains(c)).count().alias(f'word_{c}') for c in DIALOGS],
@@ -543,9 +452,18 @@ def feature_engineer(x, grp, use_extra, feature_suffix):
           in DIALOGS],
         *[pl.col("elapsed_time_diff").filter((pl.col('text').str.contains(c))).quantile(0.25).alias(f'word_quant25_{c}') for c
           in DIALOGS],
+        *[pl.col("elapsed_time_diff").filter((pl.col('text').str.contains(c))).quantile(0.3).alias(f'word_quant3_{c}') for c
+          in DIALOGS],
+        *[pl.col("elapsed_time_diff").filter((pl.col('text').str.contains(c))).quantile(0.8).alias(f'word_quant8_{c}') for c
+          in DIALOGS],
+        *[pl.col("elapsed_time_diff").filter((pl.col('text').str.contains(c))).quantile(0.5).alias(f'word_quant5_{c}') for c
+          in DIALOGS],
+        *[pl.col("elapsed_time_diff").filter((pl.col('text').str.contains(c))).quantile(0.65).alias(f'word_quant65_{c}') for c
+          in DIALOGS],
         *[pl.col("elapsed_time_diff").filter((pl.col('text').str.contains(c))).quantile(0.75).alias(f'word_quant75_{c}') for c
           in DIALOGS],
-
+        *[(pl.col("elapsed_time_diff").filter(pl.col("text") == c).max() - pl.col("elapsed_time_diff").filter(
+            pl.col("text") == c).min()).alias(f"{c}_word_max_min_{feature_suffix}") for c in DIALOGS],
 
         *[pl.col(c).drop_nulls().n_unique().alias(f"{c}_unique_{feature_suffix}") for c in CATS],
 
@@ -558,6 +476,13 @@ def feature_engineer(x, grp, use_extra, feature_suffix):
         *[pl.col(c).kurtosis().alias(f"{c}_kurtosis_{feature_suffix}") for c in NUMS],
         *[pl.col(c).quantile(0.25).alias(f"{c}_quant25_{feature_suffix}") for c in NUMS],
         *[pl.col(c).quantile(0.75).alias(f"{c}_quant75_{feature_suffix}") for c in NUMS],
+        *[pl.col(c).quantile(0.3).alias(f"{c}_quant3_{feature_suffix}") for c in NUMS],
+        *[pl.col(c).quantile(0.8).alias(f"{c}_quant8_{feature_suffix}") for c in NUMS],
+        *[pl.col(c).quantile(0.5).alias(f"{c}_quant5_{feature_suffix}") for c in NUMS],
+        *[pl.col(c).quantile(0.65).alias(f"{c}_quant65_{feature_suffix}") for c in NUMS],
+        *[pl.col(c).var().alias(f"{c}_var_{feature_suffix}") for c in NUMS],
+        *[(pl.col(c).max() - pl.col(c).min()).alias(f"{c}_max_min_{feature_suffix}") for c in NUMS],
+ 
 
         *[pl.col("fqid").filter(pl.col("fqid") == c).count().alias(f"{c}_fqid_counts{feature_suffix}")
           for c in fqid_lists],
@@ -579,8 +504,21 @@ def feature_engineer(x, grp, use_extra, feature_suffix):
           c in fqid_lists],
         *[pl.col("elapsed_time_diff").filter(pl.col("fqid") == c).quantile(0.25).alias(f"{c}_ET_quant25_{feature_suffix}") for
           c in fqid_lists],
-        *[pl.col("elapsed_time_diff").filter(pl.col("fqid") == c).quantile(0.75).alias(f"{c}_ET_quant75_{feature_suffix}") for
+        *[pl.col("elapsed_time_diff").filter(pl.col("fqid") == c).quantile(0.75).alias(f"{c}_ET_quant75_{feature_suffix}") for 
           c in fqid_lists],
+        *[pl.col("elapsed_time_diff").filter(pl.col("fqid") == c).quantile(0.3).alias(f"{c}_ET_quant3_{feature_suffix}") for
+          c in fqid_lists],
+        *[pl.col("elapsed_time_diff").filter(pl.col("fqid") == c).quantile(0.8).alias(f"{c}_ET_quant8_{feature_suffix}") for 
+          c in fqid_lists],
+        *[pl.col("elapsed_time_diff").filter(pl.col("fqid") == c).quantile(0.5).alias(f"{c}_ET_quant5_{feature_suffix}") for
+          c in fqid_lists],
+        *[pl.col("elapsed_time_diff").filter(pl.col("fqid") == c).quantile(0.65).alias(f"{c}_ET_quant65_{feature_suffix}") for
+          c in fqid_lists],
+        *[pl.col("elapsed_time_diff").filter(pl.col("fqid") == c).var().alias(f"{c}_ET_var_{feature_suffix}") for
+          c in fqid_lists],
+        *[(pl.col("elapsed_time_diff").filter(pl.col("fqid") == c).max() - pl.col("elapsed_time_diff").filter(
+            pl.col("fqid") == c).min()).alias(f"{c}_ET_max_min_{feature_suffix}") for c in fqid_lists],
+
 
 
         *[pl.col("text_fqid").filter(pl.col("text_fqid") == c).count().alias(f"{c}_text_fqid_counts{feature_suffix}")
@@ -607,6 +545,19 @@ def feature_engineer(x, grp, use_extra, feature_suffix):
           c in text_lists],
         *[pl.col("elapsed_time_diff").filter(pl.col("text_fqid") == c).quantile(0.75).alias(f"{c}_ET_quant75_{feature_suffix}") for
           c in text_lists],
+        *[pl.col("elapsed_time_diff").filter(pl.col("text_fqid") == c).quantile(0.3).alias(f"{c}_ET_quant3_{feature_suffix}") for
+          c in text_lists],
+        *[pl.col("elapsed_time_diff").filter(pl.col("text_fqid") == c).quantile(0.8).alias(f"{c}_ET_quant8_{feature_suffix}") for
+          c in text_lists],
+        *[pl.col("elapsed_time_diff").filter(pl.col("text_fqid") == c).quantile(0.5).alias(f"{c}_ET_quant5_{feature_suffix}") for
+          c in text_lists],
+        *[pl.col("elapsed_time_diff").filter(pl.col("text_fqid") == c).quantile(0.65).alias(f"{c}_ET_quant65_{feature_suffix}") for
+          c in text_lists],
+        *[pl.col("elapsed_time_diff").filter(pl.col("text_fqid") == c).var().alias(f"{c}_ET_var_{feature_suffix}") for
+          c in text_lists],
+        *[(pl.col("elapsed_time_diff").filter(pl.col("text_fqid") == c).max() - pl.col("elapsed_time_diff").filter(
+            pl.col("text_fqid") == c).min()).alias(f"{c}_ET_max_min_{feature_suffix}") for c in text_lists],
+
 
         *[pl.col("room_fqid").filter(pl.col("room_fqid") == c).count().alias(f"{c}_room_fqid_counts{feature_suffix}")
           for c in room_lists],
@@ -630,6 +581,20 @@ def feature_engineer(x, grp, use_extra, feature_suffix):
           c in room_lists],
         *[pl.col("elapsed_time_diff").filter(pl.col("room_fqid") == c).quantile(0.75).alias(f"{c}_ET_quant75_{feature_suffix}") for
           c in room_lists],
+        *[pl.col("elapsed_time_diff").filter(pl.col("room_fqid") == c).quantile(0.3).alias(f"{c}_ET_quant3_{feature_suffix}") for
+          c in room_lists],
+        *[pl.col("elapsed_time_diff").filter(pl.col("room_fqid") == c).quantile(0.8).alias(f"{c}_ET_quant8_{feature_suffix}") for
+          c in room_lists],
+        *[pl.col("elapsed_time_diff").filter(pl.col("room_fqid") == c).quantile(0.5).alias(f"{c}_ET_quant5_{feature_suffix}") for
+          c in room_lists],
+        *[pl.col("elapsed_time_diff").filter(pl.col("room_fqid") == c).quantile(0.65).alias(f"{c}_ET_quant65_{feature_suffix}") for
+          c in room_lists], 
+        *[pl.col("elapsed_time_diff").filter(pl.col("room_fqid") == c).var().alias(f"{c}_ET_var_{feature_suffix}") for
+          c in room_lists],
+        *[(pl.col("elapsed_time_diff").filter(pl.col("room_fqid") == c).max() - pl.col("elapsed_time_diff").filter(
+            pl.col("room_fqid") == c).min()).alias(f"{c}_ET_max_min_{feature_suffix}") for c in room_lists],
+
+        
 
         *[pl.col("event_name").filter(pl.col("event_name") == c).count().alias(f"{c}_event_name_counts{feature_suffix}")
           for c in event_name_feature],
@@ -655,6 +620,19 @@ def feature_engineer(x, grp, use_extra, feature_suffix):
           c in event_name_feature],
         *[pl.col("elapsed_time_diff").filter(pl.col("event_name") == c).quantile(0.75).alias(f"{c}_ET_quant75_{feature_suffix}") for
           c in event_name_feature],
+        *[pl.col("elapsed_time_diff").filter(pl.col("event_name") == c).quantile(0.3).alias(f"{c}_ET_quant3_{feature_suffix}") for
+          c in event_name_feature],
+        *[pl.col("elapsed_time_diff").filter(pl.col("event_name") == c).quantile(0.8).alias(f"{c}_ET_quant8_{feature_suffix}") for
+          c in event_name_feature],
+        *[pl.col("elapsed_time_diff").filter(pl.col("event_name") == c).quantile(0.5).alias(f"{c}_ET_quant5_{feature_suffix}") for
+          c in event_name_feature],
+        *[pl.col("elapsed_time_diff").filter(pl.col("event_name") == c).quantile(0.65).alias(f"{c}_ET_quant65_{feature_suffix}") for
+          c in event_name_feature],
+        *[pl.col("elapsed_time_diff").filter(pl.col("event_name") == c).var().alias(f"{c}_ET_var_{feature_suffix}") for
+          c in event_name_feature],
+        *[(pl.col("elapsed_time_diff").filter(pl.col("event_name") == c).max() - pl.col("elapsed_time_diff").filter(
+            pl.col("event_name") == c).min()).alias(f"{c}_ET_max_min_{feature_suffix}") for c in event_name_feature],
+
 
         *[pl.col("name").filter(pl.col("name") == c).count().alias(f"{c}_name_counts{feature_suffix}") for c in
           name_feature],
@@ -679,6 +657,19 @@ def feature_engineer(x, grp, use_extra, feature_suffix):
           c in name_feature],
         *[pl.col("elapsed_time_diff").filter(pl.col("name") == c).quantile(0.75).alias(f"{c}_ET_quant75_{feature_suffix}") for
           c in name_feature],
+         *[pl.col("elapsed_time_diff").filter(pl.col("name") == c).quantile(0.3).alias(f"{c}_ET_quant3_{feature_suffix}") for
+          c in name_feature],
+        *[pl.col("elapsed_time_diff").filter(pl.col("name") == c).quantile(0.8).alias(f"{c}_ET_quant8_{feature_suffix}") for
+          c in name_feature],
+        *[pl.col("elapsed_time_diff").filter(pl.col("name") == c).quantile(0.5).alias(f"{c}_ET_quant5_{feature_suffix}") for
+          c in name_feature],
+        *[pl.col("elapsed_time_diff").filter(pl.col("name") == c).quantile(0.65).alias(f"{c}_ET_quant65_{feature_suffix}") for
+          c in name_feature], 
+        *[pl.col("elapsed_time_diff").filter(pl.col("name") == c).var().alias(f"{c}_ET_var_{feature_suffix}") for
+          c in name_feature],
+        *[(pl.col("elapsed_time_diff").filter(pl.col("name") == c).max() - pl.col("elapsed_time_diff").filter(
+            pl.col("name") == c).min()).alias(f"{c}_ET_max_min_{feature_suffix}") for c in name_feature],
+
 
         *[pl.col("level").filter(pl.col("level") == c).count().alias(f"{c}_LEVEL_count{feature_suffix}") for c in
           LEVELS],
@@ -704,6 +695,19 @@ def feature_engineer(x, grp, use_extra, feature_suffix):
           c in LEVELS],
         *[pl.col("elapsed_time_diff").filter(pl.col("level") == c).quantile(0.75).alias(f"{c}_ET_quant75_{feature_suffix}") for
           c in LEVELS],
+        *[pl.col("elapsed_time_diff").filter(pl.col("level") == c).quantile(0.3).alias(f"{c}_ET_quant3_{feature_suffix}") for
+          c in LEVELS],
+        *[pl.col("elapsed_time_diff").filter(pl.col("level") == c).quantile(0.8).alias(f"{c}_ET_quant8_{feature_suffix}") for
+          c in LEVELS],
+        *[pl.col("elapsed_time_diff").filter(pl.col("level") == c).quantile(0.5).alias(f"{c}_ET_quant5_{feature_suffix}") for
+          c in LEVELS],
+        *[pl.col("elapsed_time_diff").filter(pl.col("level") == c).quantile(0.65).alias(f"{c}_ET_quant65_{feature_suffix}") for
+          c in LEVELS],
+        *[pl.col("elapsed_time_diff").filter(pl.col("level") == c).var().alias(f"{c}_var_{feature_suffix}") for
+          c in LEVELS],
+        *[(pl.col("elapsed_time_diff").filter(pl.col("level") == c).max() - pl.col("elapsed_time_diff").filter(
+            pl.col("level") == c).min()).alias(f"{c}_ET_max_min_{feature_suffix}") for c in LEVELS],
+
 
         *[pl.col("level_group").filter(pl.col("level_group") == c).count().alias(
             f"{c}_LEVEL_group_count{feature_suffix}") for c in
@@ -731,12 +735,35 @@ def feature_engineer(x, grp, use_extra, feature_suffix):
         *[pl.col("elapsed_time_diff").filter(pl.col("level_group") == c).quantile(0.25).alias(f"{c}_ET_quant25_{feature_suffix}") for
           c in level_groups],
         *[pl.col("elapsed_time_diff").filter(pl.col("level_group") == c).quantile(0.75).alias(f"{c}_ET_quant75_{feature_suffix}") for
+          c in level_groups],
+        *[pl.col("elapsed_time_diff").filter(pl.col("level_group") == c).quantile(0.3).alias(f"{c}_ET_quant3_{feature_suffix}") for
+          c in level_groups],
+        *[pl.col("elapsed_time_diff").filter(pl.col("level_group") == c).quantile(0.8).alias(f"{c}_ET_quant8_{feature_suffix}") for
+          c in level_groups],
+        *[pl.col("elapsed_time_diff").filter(pl.col("level_group") == c).quantile(0.5).alias(f"{c}_ET_quant5_{feature_suffix}") for
+          c in level_groups],
+        *[pl.col("elapsed_time_diff").filter(pl.col("level_group") == c).quantile(0.65).alias(f"{c}_ET_quant65_{feature_suffix}") for
+          c in level_groups],
+        *[(pl.col("elapsed_time_diff").filter(pl.col("level_group") == c).max() - pl.col("elapsed_time_diff").filter(
+            pl.col("level_group") == c).min()).alias(f"{c}_ET_max_min_{feature_suffix}") for c in level_groups],
+        *[pl.col("elapsed_time_diff").filter(pl.col("level_group") == c).var().alias(f"{c}_ET_var_{feature_suffix}") for
           c in level_groups]
 
     ]
     # df = x.groupby(['session_id']).agg(aggs).sort_values("session_id")
 
     df = x.with_columns(COLUMNS).groupby(['session_id'], maintain_order=True).agg(aggs).sort("session_id")
+
+    # Time features - Year, month, ...
+    df = df.with_columns(
+        pl.col("session_id").apply(lambda x: int(str(x)[:2])).alias('year'),
+        pl.col("session_id").apply(lambda x: int(str(x)[2:4])+1).alias('month'),
+        pl.col("session_id").apply(lambda x: int(str(x)[4:6])).alias('day'),
+        pl.col("session_id").apply(lambda x: int(str(x)[6:8])).alias('hour'),
+        pl.col("session_id").apply(lambda x: int(str(x)[8:10])).alias('minute'),
+        pl.col("session_id").apply(lambda x: int(str(x)[10:12])).alias('second'),
+        pl.col("session_id").apply(lambda x: int(str(x)[12:])).alias('id_anonymous'),
+    )
 
     if use_extra:
         if grp == '5-12':
@@ -791,7 +818,7 @@ def feature_engineer(x, grp, use_extra, feature_suffix):
             tmp = x.groupby(["session_id"], maintain_order=True).agg(aggs).sort("session_id")
             df = df.join(tmp, on="session_id", how='left')
 
-    return df.to_pandas()
+    return df.to_pandas(), x.with_columns(COLUMNS).to_pandas()
 
 def time_feature(train):
     train = train.reset_index()
@@ -959,7 +986,7 @@ def feature_quest(new_train, train, q):
     i = 0
     for text in texts[q]:
         i += 1
-        train_q['text' + str(i)] = train[train['text'] == text].groupby(['session_id'])['delt_time'].sum()
+        train_q['text' + str(i)] = train[train['text'] == text].groupby(['session_id'])['elapsed_time_diff'].sum()
     
     fqids = {
          1: ['directory'], 
@@ -983,7 +1010,7 @@ def feature_quest(new_train, train, q):
          18:['chap4_finale_c'], 
         }
     for fqid in fqids[q]:
-        train_q['t_fqid_' + fqid] = train[train['fqid'] == fqid].groupby(['session_id'])['delt_time'].sum()
+        train_q['t_fqid_' + fqid] = train[train['fqid'] == fqid].groupby(['session_id'])['elapsed_time_diff'].sum()
 
     text_fqids = {
         1:[],
@@ -1024,7 +1051,7 @@ def feature_quest(new_train, train, q):
     }
     for text_fqid in text_fqids[q]:
         maska = train['text_fqid'] == text_fqid
-        train_q['t_text_fqid_' + text_fqid] = train[maska].groupby(['session_id'])['delt_time'].sum()       
+        train_q['t_text_fqid_' + text_fqid] = train[maska].groupby(['session_id'])['elapsed_time_diff'].sum()       
         train_q['l_text_fqid_' + text_fqid] = train[train['text_fqid'] == text_fqid].groupby(['session_id'])['index'].count()
 
 
@@ -1067,40 +1094,56 @@ def feature_quest(new_train, train, q):
     for rl in room_lvls[q]:
         nam = rl[0]+str(rl[1])
         maska = (train['room_fqid'] == rl[0])&(train['level'] == rl[1])
-        train_q['t_' + nam] = train[maska].groupby(['session_id'])['delt_time'].sum()
+        train_q['t_' + nam] = train[maska].groupby(['session_id'])['elapsed_time_diff'].sum()
         train_q['l_' + nam] = train[maska].groupby(['session_id'])['index'].count()
 
     return train_q
 
 def load_targets(args):
-    targets = pd.read_csv(args.target)
+    targets = pd.read_parquet(args.target)
+    # targets = pd.read_csv(args.target)
     targets["session"] = targets["session_id"].str.split("_",expand = True)[0]
     targets["session"] = targets["session"].astype(int)
     targets['q'] = targets.session_id.apply(lambda x: int(x.split('_')[-1][1:]) )
     return targets
 
-def delt_time_def(df):
-    df.sort_values(by=['session_id', 'elapsed_time'], inplace=True)
-    df['d_time'] = df['elapsed_time'].diff(1)
-    df['d_time'].fillna(0, inplace=True)
-    df['delt_time'] = df['d_time'].clip(0, 103000)  
-    return df
+def feat_to_use(args, train, q):
+    # save features for each questions
+    if os.path.exists(args.features):
+        feat_dic = pickle.load(open(args.features, 'rb'))
+    else:
+        feat_dic = {}
+    null = train.isnull().sum().sort_values(ascending=False) / len(train)
+    drop = list(null[null > 0.9].index)
+    for col in [c for c in train.columns if c not in drop]:
+        if train[col].nunique() == 1:
+            drop.append(col)
+    feat = [c for c in train.columns if c not in drop]
+    feat_dic[q] = feat
+    # save feat dic
+    pickle.dump(feat_dic, open(args.features, 'wb'))
+
+    return feat
 
 
 def preprocessing(df, grp):
-    start, end = map(int,grp.split('-'))
-    kol_lvl = (df.groupby(['session_id'])['level'].agg('nunique') < end - start + 1)
-    list_session = kol_lvl[kol_lvl].index
-    df = df[~df['session_id'].isin(list_session)]
-    df = delt_time_def(df)
-    train_ = feature_engineer(pl.from_pandas(df), grp, use_extra=False, feature_suffix='')
+    # start, end = map(int,grp.split('-'))
+    # kol_lvl = (df.groupby(['session_id'])['level'].agg('nunique') < end - start + 1)
+    # list_session = kol_lvl[kol_lvl].index
+    # df = df[~df['session_id'].isin(list_session)]
+    # df = delt_time_def(df) # elapsed_time_diff feature와 겹치므로 이후 수정하기
+    train_, df = feature_engineer(pl.from_pandas(df), grp, use_extra=False, feature_suffix='')
     # recap text count \w join
     train = text_cnt(df, train_)
-    # add year, month, day etc.
-    train = time_feature(train)
+    
+    # add year, month, day etc. - incorporate into feature_engineer
+    # train = time_feature(train)
+
     
     # df = new_page(df, grp)
     
     
     
     return train, df
+
+
