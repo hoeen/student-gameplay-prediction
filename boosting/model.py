@@ -1,5 +1,6 @@
-from feature_engineering import feature_quest, feat_to_use
-from catboost import CatBoostClassifier
+from feature_engineering import feature_quest
+# from catboost import CatBoostClassifier
+
 from sklearn.model_selection import GroupKFold, train_test_split
 from sklearn.metrics import f1_score, precision_score, recall_score
 
@@ -10,7 +11,7 @@ import pickle
 
 xgb_params = {
         'booster': 'gbtree',
-        'tree_method': 'gpu_hist',
+        'tree_method': 'hist',
         'objective': 'binary:logistic',
         'eval_metric':'logloss',
         'learning_rate': 0.02,
@@ -21,18 +22,6 @@ xgb_params = {
         'seed': 42
         }
 
-cat_params = {
-        'n_estimators' : 300,
-        'learning_rate': 0.045,
-        'depth' : 6,
-        'task_type':'GPU',
-
-        # 'n_estimators':1, 'depth':1
-
-        # 'depth': 7, 'iterations': 100, 'learning_rate': 0.05
-    }
-
-estimators_xgb = [498, 448, 378, 364, 405, 495, 456, 249, 384, 405, 356, 262, 484, 381, 392, 248 ,248, 345]
 
 def create_model(args, train, old_train, quests, targets, models: dict, results: list):
     cate_cols = train.dtypes[(train.dtypes == 'object') |\
@@ -68,15 +57,9 @@ def create_model(args, train, old_train, quests, targets, models: dict, results:
     # ITERATE THRU QUESTIONS
     for q in quests:   
         print('Question', q)     
-        q_train = feature_quest(train, old_train, q)
-
-        # USE SELECTED FEATURES 
-        # if args.level_group == '13-22':
-        #     FEATURES = list(np.load(args.base_dir + 'data/features/g3_feature_posimp.npy', allow_pickle=True))
-        # else:
-        #     FEATURES = feat_to_use(args, q_train, q)
-        FEATURES = pos_feat[q]
-        print(f'Using {len(FEATURES)} columns')
+        train_q = feature_quest(train, old_train, q)
+ 
+       
         # set n_estimator params
         # from : https://www.kaggle.com/code/pourchot/simple-xgb
         xgb_params['n_estimators'] = estimators_xgb[q-1]
@@ -99,22 +82,17 @@ def create_model(args, train, old_train, quests, targets, models: dict, results:
 
                 y_train = train_y.iloc[train_idx]['correct']
                 y_val = train_y.iloc[val_idx]['correct'].values
+                
+                model = XGBClassifier(
+                    **xgb_params
 
-                if args.model == 'xgb':
-                    model = XGBClassifier(
-                        **xgb_params
-                    )
-                    model.fit(X_train, y_train, 
-                            #   eval_set=[(X_train, y_train), (X_val, y_val)], 
-                              verbose=False)
-
-                elif args.model == 'catboost':
-                    model = CatBoostClassifier(
-                    **cat_params
                 )
                     model.fit(X_train, y_train, verbose=False,
                               cat_features = cate_cols)
                 
+                model.fit(X_train, y_train, verbose=True,)
+                        # cat_features = cate_cols)
+
                 
                 # SAVE MODEL
                 models[(k, q)] = model #fold, q
@@ -142,18 +120,13 @@ def create_model(args, train, old_train, quests, targets, models: dict, results:
             y_train = train_y.loc[user_train]['correct']
             y_val = train_y.loc[user_val]['correct'].values
 
-            if args.model == 'xgb':
-                model = XGBClassifier(
+            model = XGBClassifier(
                     **xgb_params
                 )
-                model.fit(X_train, y_train, verbose=False)
+            
+            model.fit(X_train, y_train, verbose=False,) 
+                    # cat_features = cate_cols)
 
-            elif args.model == 'catboost':
-                model = CatBoostClassifier(
-                    **cat_params
-            )
-                model.fit(X_train, y_train, verbose=False,
-                            cat_features = cate_cols)
             
             # SAVE MODEL
             models[q] = model #fold, q
