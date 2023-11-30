@@ -4,10 +4,8 @@
 - Kaggle [Predict Student Performance from Game Play](https://www.kaggle.com/competitions/predict-student-performance-from-game-play/overview) 대회에 참여하였습니다.  
 - 유저의 게임 기록을 순서대로 추적하는 것이 학습 상태 파악에 적합하다고 판단, sequential model을 이용하는 방향으로 접근했습니다.
 - LSTM을 이용하여 사용자의 게임 로그를 embedded sequence data로 변환, 정답여부를 예측하였습니다.
-- LSTM으로 LB f1-score를 0.671으로 향상하였습니다
+- mean score 기반 baseline 0.65 대비 LSTM으로 CV f1-score를 0.67로 향상시켰습니다.
 
-### Ongoing
-- LB에서 점수가 낮아 CV의 overfitting이 우려됨. 모델의 complexity를 줄이고 일반화 성능을 높이는 중
 
 Project Organization
 ------------
